@@ -78,11 +78,17 @@ Contributions and feedback are highly encouraged.
 
 # 📦 Installation
 
+This project is organized as a **Cargo workspace** with two crates:
+
+- **`executor`**: The core runtime library  
+- **`executor-macros`**: Procedural macros for task definition and scheduling helpers
+
 During development:
 
 ``` toml
 [dependencies]
-executor = { path = "https://github.com/enzoblain/Executor" }
+executor = { git = "https://github.com/enzoblain/Executor" }
+executor-macros = { git = "https://github.com/enzoblain/Executor" }
 ```
 
 Once published:
@@ -90,6 +96,7 @@ Once published:
 ``` toml
 [dependencies]
 executor = "0.1"
+executor-macros = "0.1"
 ```
 
 Planned `no-std` mode (feature flag stubbed, support coming later):

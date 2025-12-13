@@ -1,11 +1,6 @@
-[package]
-name = "executor"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-
-[features]
-default = ["std"]
-std = []
-no-std = [] # placeholder; runtime support is planned
+[workspace]
+members = [
+    "executor",
+    "executor-macros",
+]
+resolver = "2"
