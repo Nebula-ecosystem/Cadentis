@@ -9,3 +9,4 @@ executor-macros = { path = "../executor-macros", optional = true }
 [features]
 default = ["std"]
 std = ["executor-macros"]
+no-std = []

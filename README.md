@@ -124,6 +124,7 @@ Typical workflow:
 cargo fmt
 cargo clippy
 cargo test --workspace
+cargo check -p executor --no-default-features --features no-std
 ```
 
 See `CONTRIBUTING.md` for details.
