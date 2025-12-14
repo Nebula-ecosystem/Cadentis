@@ -1,6 +1,6 @@
-# Contributing to Executor
+# Contributing to Async
 
-Thank you for considering contributing to **Executor**!  
+Thank you for considering contributing to **Async**!  
 We welcome all kinds of contributions: bug reports, feature requests, documentation improvements, examples, or code enhancements.
 
 ---
@@ -10,8 +10,8 @@ We welcome all kinds of contributions: bug reports, feature requests, documentat
 1. **Fork the repository**  
 2. **Clone your fork** locally:  
 ```
-git clone https://github.com/enzoblain/Executor.git
-cd Executor
+git clone https://github.com/enzoblain/Async.git
+cd Async
 ```  
 3. **Create a new branch** for your feature or fix:  
 ```
@@ -78,4 +78,4 @@ If you find a bug or have a feature request, please open an **issue**:
 ## 🎉 Thank You!
 
 We appreciate your contributions!  
-Every bug report, PR, and suggestion helps make **Executor** better and more robust.
+Every bug report, PR, and suggestion helps make **Async** better and more robust.

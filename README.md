@@ -1,14 +1,14 @@
-# Executor
+# Async
 
 [![Rust](https://img.shields.io/badge/Rust-1.91-orange?logo=rust)](https://www.rust-lang.org/)    
 [![License](https://img.shields.io/badge/license-SSPL-blue.svg)](LICENSE)
 
 ---
 
-**Executor** is a lightweight, predictable task runner written in **Rust**.
+**Async** is a lightweight, predictable task runner written in **Rust**.
 
 Designed for **systems programming** and **application-level coordination**,  
-Executor provides the fundamental building blocks to schedule, drive, and monitor  
+Async provides the fundamental building blocks to schedule, drive, and monitor  
 units of work — with or without async.
 
 It aims to be a **clear, minimal foundation** for building custom schedulers,  
@@ -16,12 +16,12 @@ service runtimes, and deterministic task pipelines.
 
 ---
 
-# 🧩 Purpose of Executor
+# 🧩 Purpose of Async
 
 Modern services — networking stacks, embedded runtimes, job systems, or orchestrators —
 often need a **deterministic, observable execution loop** they control end-to-end.
 
-Executor focuses on:
+Async focuses on:
 
 - predictable task progression (no hidden threads)  
 - simple scheduling hooks you can extend  
@@ -62,7 +62,7 @@ latency budgets and ordering guarantees matter.
 
 🚧 **Active Development**
 
-Executor is evolving toward a small, hackable runtime core.
+Async is evolving toward a small, hackable runtime core.
 
 Current focus areas include:
 
@@ -78,32 +78,11 @@ Contributions and feedback are highly encouraged.
 
 # 📦 Installation
 
-This project is organized as a **Cargo workspace** with two crates:
+Add it to your project:
 
-- **`executor`**: The core runtime library  
-- **`executor-macros`**: Procedural macros for task definition and scheduling helpers
-
-During development:
-
-``` toml
+```toml
 [dependencies]
-executor = { git = "https://github.com/enzoblain/Executor" }
-executor-macros = { git = "https://github.com/enzoblain/Executor" }
-```
-
-Once published:
-
-``` toml
-[dependencies]
-executor = "0.1"
-executor-macros = "0.1"
-```
-
-Planned `no-std` mode (feature flag stubbed, support coming later):
-
-``` toml
-[dependencies]
-executor = { version = "0.1", features = ["no-std"] }
+async = { git = "https://github.com/enzoblain/Async" }
 ```
 
 ---
@@ -120,11 +99,11 @@ Contributions are welcome — especially regarding:
 
 Typical workflow:
 
-``` sh
-cargo fmt
-cargo clippy
-cargo test --workspace
-cargo check -p executor --no-default-features --features no-std
+```sh
+cargo fmt -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo build
+cargo test
 ```
 
 See `CONTRIBUTING.md` for details.
@@ -133,13 +112,13 @@ See `CONTRIBUTING.md` for details.
 
 # 📄 License Philosophy
 
-Executor is licensed under the **Server Side Public License (SSPL) v1**.
+Async is licensed under the **Server Side Public License (SSPL) v1**.
 
 This license ensures the runtime remains **open** while preventing  
 proprietary forks or commercial services from exploiting the project  
 without contributing back.
 
-It protects Executor in contexts where determinism, transparency, and ecosystem integrity matter.
+It protects Async in contexts where determinism, transparency, and ecosystem integrity matter.
 
 ---
 
