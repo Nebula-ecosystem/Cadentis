@@ -7,11 +7,14 @@ use crate::context::enter_context;
 use crate::executor::Executor;
 use crate::queue::TaskQueue;
 use crate::task::Task;
+use crate::timer;
 use crate::waker::noop_waker;
 
 use std::future::Future;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::thread;
+use std::time::Duration;
 
 /// Main async runtime for executing futures.
 ///
@@ -84,14 +87,29 @@ impl Runtime {
             let mut cx = Context::from_waker(&w);
 
             loop {
-                match fut.as_mut().poll(&mut cx) {
-                    Poll::Ready(val) => {
-                        self.executor.run();
-                        return val;
-                    }
-                    Poll::Pending => {
-                        self.executor.run();
-                    }
+                // Try to make progress on the main future
+                if let Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    self.executor.run();
+                    return val;
+                }
+
+                // Execute all spawned tasks
+                self.executor.run();
+
+                // Check and fire any expired timers (this wakes sleeping tasks)
+                let has_pending_timers = timer::process_timers();
+
+                // If no tasks are queued and no timers are pending, we deadlock
+                // This shouldn't happen in well-formed async code
+                if self.queue.is_empty() && !has_pending_timers {
+                    // Main future is pending, no tasks, no timers -> deadlock
+                    panic!("deadlock: main future is pending with no pending work");
+                }
+
+                // If no tasks are queued but timers are pending, sleep briefly
+                // to avoid busy polling while timers advance
+                if self.queue.is_empty() {
+                    thread::sleep(Duration::from_millis(1));
                 }
             }
         })

@@ -11,6 +11,7 @@
 //! - **Task**: Wraps a future with waker integration
 //! - **Waker**: Implements task wake-up mechanisms
 //! - **RuntimeBuilder**: Fluent builder pattern for runtime instantiation
+//! - **Timer**: Sleep futures for time-based delays and scheduling
 
 mod builder;
 mod context;
@@ -18,9 +19,11 @@ mod executor;
 mod queue;
 mod runtime;
 mod task;
+mod timer;
 mod waker;
 
 pub use builder::RuntimeBuilder;
 pub use context::spawn;
 pub use runtime::Runtime;
 pub use task::Task;
+pub use timer::sleep;

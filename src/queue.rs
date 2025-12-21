@@ -47,4 +47,12 @@ impl TaskQueue {
     pub(crate) fn pop(&self) -> Option<Arc<Task>> {
         self.queue.lock().unwrap().pop_front()
     }
+
+    /// Checks if the task queue is empty.
+    ///
+    /// # Returns
+    /// true if no tasks are queued, false otherwise
+    pub(crate) fn is_empty(&self) -> bool {
+        self.queue.lock().unwrap().is_empty()
+    }
 }
