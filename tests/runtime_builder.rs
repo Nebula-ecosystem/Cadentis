@@ -1,4 +1,4 @@
-use r#async::RuntimeBuilder;
+use reactor::RuntimeBuilder;
 use std::sync::{Arc, Mutex};
 
 #[test]

@@ -1,4 +1,4 @@
-use r#async::{Runtime, task::Task};
+use reactor::{Runtime, task::Task};
 use std::sync::{Arc, Mutex};
 
 #[test]

@@ -1,4 +1,4 @@
-use r#async::{Runtime, sleep};
+use reactor::{Runtime, sleep};
 use std::time::{Duration, Instant};
 
 #[test]

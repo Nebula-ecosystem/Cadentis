@@ -1,14 +1,14 @@
-# Async
+# Reactor
 
 [![Rust](https://img.shields.io/badge/Rust-1.91-orange?logo=rust)](https://www.rust-lang.org/)    
 [![License](https://img.shields.io/badge/license-SSPL-blue.svg)](LICENSE)
 
 ---
 
-**Async** is a lightweight, predictable task runner written in **Rust**.
+**Reactor** is a lightweight, predictable event-driven runtime written in **Rust**.
 
 Designed for **systems programming** and **application-level coordination**,  
-Async provides the fundamental building blocks to schedule, drive, and monitor  
+Reactor provides the fundamental building blocks to schedule, drive, and monitor  
 units of work — with or without async.
 
 It aims to be a **clear, minimal foundation** for building custom schedulers,  
@@ -16,12 +16,12 @@ service runtimes, and deterministic task pipelines.
 
 ---
 
-# 🧩 Purpose of Async
+# 🧩 Purpose of Reactor
 
 Modern services — networking stacks, embedded runtimes, job systems, or orchestrators —
 often need a **deterministic, observable execution loop** they control end-to-end.
 
-Async focuses on:
+Reactor focuses on:
 
 - predictable task progression (no hidden threads)  
 - simple scheduling hooks you can extend  
@@ -42,7 +42,7 @@ latency budgets and ordering guarantees matter.
   No hidden threads; ordering and progression are explicit and testable.
 
 - 🧩 **Sync First, Async Ready**  
-  Start with synchronous tasks; evolve toward async executors or reactors as needed.
+  Start with synchronous tasks; evolve toward async executors as needed.
 
 - 🌐 **No-Std (Planned)**  
   A `no-std` mode is on the roadmap for constrained targets; feature flag is stubbed today.
@@ -62,7 +62,7 @@ latency budgets and ordering guarantees matter.
 
 🚧 **Active Development**
 
-Async is evolving toward a small, hackable runtime core.
+Reactor is evolving toward a small, hackable runtime core.
 
 Current focus areas include:
 
@@ -82,7 +82,7 @@ Add it to your project:
 
 ```toml
 [dependencies]
-async = { git = "https://github.com/enzoblain/Async" }
+reactor = { git = "https://github.com/enzoblain/Async" }
 ```
 
 ---
@@ -112,13 +112,13 @@ See `CONTRIBUTING.md` for details.
 
 # 📄 License Philosophy
 
-Async is licensed under the **Server Side Public License (SSPL) v1**.
+Reactor is licensed under the **Server Side Public License (SSPL) v1**.
 
 This license ensures the runtime remains **open** while preventing  
 proprietary forks or commercial services from exploiting the project  
 without contributing back.
 
-It protects Async in contexts where determinism, transparency, and ecosystem integrity matter.
+It protects Reactor in contexts where determinism, transparency, and ecosystem integrity matter.
 
 ---
 

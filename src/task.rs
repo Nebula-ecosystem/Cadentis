@@ -81,9 +81,9 @@ impl Task {
     ///
     /// # Example
     /// ```ignore
-    /// use r#async::task::Task;
+    /// use reactor::task::Task;
     ///
-    /// let rt = r#async::Runtime::new();
+    /// let rt = reactor::Runtime::new();
     /// rt.block_on(async {
     ///     Task::spawn(async {
     ///         println!("Spawned task");

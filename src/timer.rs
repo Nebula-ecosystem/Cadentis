@@ -115,7 +115,7 @@ impl Future for Sleep {
 ///
 /// # Example
 /// ```ignore
-/// use r#async::sleep;
+/// use reactor::sleep;
 /// use std::time::Duration;
 ///
 /// async {
