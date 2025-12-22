@@ -3,7 +3,7 @@
 //! Provides a thread-local runtime handle that allows spawning tasks without
 //! explicitly passing a runtime reference, similar to tokio::spawn.
 
-use crate::queue::TaskQueue;
+use super::queue::TaskQueue;
 
 use std::cell::RefCell;
 use std::sync::Arc;

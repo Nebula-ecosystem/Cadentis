@@ -3,12 +3,9 @@
 //! The runtime coordinates the execution of a main future via `block_on` and handles
 //! spawned background tasks. It uses a task queue and executor to manage concurrent execution.
 
-use crate::context::enter_context;
-use crate::executor::Executor;
-use crate::queue::TaskQueue;
+use crate::runtime::{Executor, TaskQueue, enter_context, noop_waker};
 use crate::task::Task;
 use crate::timer;
-use crate::waker::noop_waker;
 
 use std::future::Future;
 use std::sync::Arc;

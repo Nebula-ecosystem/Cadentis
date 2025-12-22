@@ -4,9 +4,7 @@
 //! when the future is ready to make progress. Supports both direct task execution via
 //! the runtime and global task spawning without requiring an explicit runtime reference.
 
-use crate::context::{CURRENT_QUEUE, enter_context};
-use crate::queue::TaskQueue;
-use crate::waker::make_waker;
+use crate::runtime::{CURRENT_QUEUE, TaskQueue, enter_context, make_waker};
 
 use std::future::Future;
 use std::pin::Pin;

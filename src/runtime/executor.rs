@@ -3,7 +3,7 @@
 //! The executor is responsible for polling ready tasks from the task queue
 //! until they complete or yield with Poll::Pending.
 
-use crate::queue::TaskQueue;
+use super::queue::TaskQueue;
 
 use std::sync::Arc;
 
