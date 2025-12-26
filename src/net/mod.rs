@@ -1,6 +1,27 @@
 //! TCP networking primitives.
 //!
-//! Provides `TcpListener` and `TcpStream` for non-blocking TCP I/O operations.
+//! This module provides non-blocking TCP networking primitives for async I/O:
+//! - [`tcp_listener`]: [`TcpListener`] for accepting connections
+//! - [`tcp_stream`]: [`TcpStream`] for reading/writing data
+//! - [`future`]: Low-level futures for TCP operations
+//! - [`utils`]: Address parsing and conversion utilities
+//!
+//! # Example
+//!
+//! ```ignore
+//! use reactor::net::tcp_listener::TcpListener;
+//!
+//! async fn server() {
+//!     let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+//!     loop {
+//!         let (stream, addr) = listener.accept().await.unwrap();
+//!         println!("New connection from {}", addr);
+//!     }
+//! }
+//! ```
+//!
+//! [`TcpListener`]: tcp_listener::TcpListener
+//! [`TcpStream`]: tcp_stream::TcpStream
 
 pub mod future;
 pub mod tcp_listener;

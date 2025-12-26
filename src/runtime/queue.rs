@@ -1,27 +1,31 @@
 //! Thread-safe task queue for managing ready tasks.
 //!
 //! Provides a FIFO queue that allows pushing tasks to be executed and popping
-//! them for execution by the executor.
+//! them for execution by the executor. The queue is thread-safe and can be
+//! safely shared across multiple threads.
 
 use crate::task::Task;
 
-use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// A thread-safe, FIFO queue for storing executable tasks.
 ///
 /// Uses a Mutex-wrapped VecDeque to allow safe concurrent access from multiple threads.
 /// Tasks are pushed when spawned and popped by the executor for execution.
 pub(crate) struct TaskQueue {
-    pub(crate) queue: RefCell<VecDeque<Rc<Task>>>,
+    /// The internal queue protected by a mutex for thread safety.
+    pub(crate) queue: Mutex<VecDeque<Arc<Task>>>,
 }
 
 impl TaskQueue {
     /// Creates a new empty task queue.
+    ///
+    /// # Returns
+    /// A new `TaskQueue` with no tasks
     pub(crate) fn new() -> Self {
         Self {
-            queue: RefCell::new(VecDeque::new()),
+            queue: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -31,20 +35,23 @@ impl TaskQueue {
     ///
     /// # Arguments
     /// * `task` - The task to enqueue
-    pub(crate) fn push(&self, task: Rc<Task>) {
-        self.queue.borrow_mut().push_back(task);
+    pub(crate) fn push(&self, task: Arc<Task>) {
+        self.queue.lock().unwrap().push_back(task);
     }
 
     /// Dequeues and returns the next ready task.
     ///
     /// # Returns
-    /// Some(task) if a task is available, None if the queue is empty
-    pub(crate) fn pop(&self) -> Option<Rc<Task>> {
-        self.queue.borrow_mut().pop_front()
+    /// `Some(task)` if a task is available, `None` if the queue is empty
+    pub(crate) fn pop(&self) -> Option<Arc<Task>> {
+        self.queue.lock().unwrap().pop_front()
     }
 
     /// Checks if the task queue is empty.
+    ///
+    /// # Returns
+    /// `true` if the queue contains no tasks, `false` otherwise
     pub(crate) fn is_empty(&self) -> bool {
-        self.queue.borrow().is_empty()
+        self.queue.lock().unwrap().is_empty()
     }
 }

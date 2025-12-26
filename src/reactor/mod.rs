@@ -1,6 +1,12 @@
 //! Event-driven I/O reactor module.
 //!
-//! Provides the core event-driven I/O handling using kqueue on macOS.
+//! This module provides the core event-driven I/O handling using kqueue on macOS.
+//! It includes:
+//! - [`core`]: The main reactor implementation
+//! - [`event`]: kqueue event wrappers
+//! - [`io`]: Connection state management
+//! - [`sleep`]: Timer-based sleep futures
+//! - [`socket`]: Socket acceptance utilities
 
 pub mod core;
 pub mod event;
