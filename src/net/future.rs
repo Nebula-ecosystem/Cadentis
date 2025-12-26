@@ -4,7 +4,7 @@ use crate::net::utils::sockaddr_to_socketaddr;
 use crate::reactor::core::with_current_reactor;
 use crate::reactor::event::Event;
 
-use libc::{accept, read, sockaddr, sockaddr_in, socklen_t, write, EAGAIN, EWOULDBLOCK};
+use libc::{EAGAIN, EWOULDBLOCK, accept, read, sockaddr, sockaddr_in, socklen_t, write};
 use std::future::Future;
 use std::io;
 use std::mem;
@@ -89,7 +89,13 @@ impl<'a> Future for ReadFuture<'a> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.as_mut().get_unchecked_mut() };
 
-        let res = unsafe { read(this.file_descriptor, this.buffer.as_mut_ptr() as *mut _, this.buffer.len()) };
+        let res = unsafe {
+            read(
+                this.file_descriptor,
+                this.buffer.as_mut_ptr() as *mut _,
+                this.buffer.len(),
+            )
+        };
 
         if res > 0 {
             return Poll::Ready(Ok(res as usize));
@@ -139,7 +145,13 @@ impl<'a> Future for WriteFuture<'a> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = unsafe { self.as_mut().get_unchecked_mut() };
 
-        let res = unsafe { write(this.file_descriptor, this.buffer.as_ptr() as *const _, this.buffer.len()) };
+        let res = unsafe {
+            write(
+                this.file_descriptor,
+                this.buffer.as_ptr() as *const _,
+                this.buffer.len(),
+            )
+        };
 
         if res >= 0 {
             return Poll::Ready(Ok(res as usize));

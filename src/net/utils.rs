@@ -1,6 +1,6 @@
 //! Socket address parsing and conversion utilities.
 
-use libc::{in_addr, sockaddr_in, AF_INET};
+use libc::{AF_INET, in_addr, sockaddr_in};
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
