@@ -1,5 +1,5 @@
-use reactor::tools::retry;
-use reactor::{RuntimeBuilder, Task};
+use cadentis::tools::retry;
+use cadentis::{RuntimeBuilder, Task};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -58,7 +58,7 @@ fn test_retry_fails_after_limit() {
 
 #[test]
 fn test_retry_with_interval() {
-    use reactor::time::sleep;
+    use cadentis::time::sleep;
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
@@ -113,7 +113,7 @@ fn test_retry_with_interval() {
 }
 #[test]
 fn test_timeout_with_retry() {
-    use reactor::time::timeout;
+    use cadentis::time::timeout;
     use std::time::Duration;
 
     let mut rt = RuntimeBuilder::new().enable_io().build();
@@ -126,9 +126,8 @@ fn test_timeout_with_retry() {
             Task::spawn(async move {
                 let n = attempts_clone.fetch_add(1, Ordering::SeqCst);
                 timeout(Duration::from_millis(10), async move {
-                    // Simule une tâche qui prend du temps et échoue sur timeout
                     if n < 3 {
-                        reactor::time::sleep(Duration::from_millis(20)).await;
+                        cadentis::time::sleep(Duration::from_millis(20)).await;
                         Ok::<_, &str>(0)
                     } else {
                         Ok::<_, &str>(123)
@@ -141,7 +140,6 @@ fn test_timeout_with_retry() {
         .await
     });
 
-    // On doit réussir après quelques timeouts
     assert!(
         matches!(result, Ok(123)),
         "Timeout+Retry doit finir par réussir"

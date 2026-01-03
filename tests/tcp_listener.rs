@@ -1,5 +1,5 @@
-use reactor::net::tcp_listener::TcpListener;
-use reactor::{RuntimeBuilder, Task};
+use cadentis::net::tcp_listener::TcpListener;
+use cadentis::{RuntimeBuilder, Task};
 use std::io::{Read, Write};
 use std::net::TcpStream as StdTcpStream;
 use std::sync::{Arc, Mutex};
@@ -31,7 +31,6 @@ fn tcp_accept_and_echo() {
             buf.to_vec()
         });
 
-        // Wait for the spawned task to complete
         handle.await;
 
         let result = client_thread.join().unwrap();
@@ -68,7 +67,6 @@ fn tcp_write_all_large_payload() {
             *received_clone.lock().unwrap() = buf;
         });
 
-        // Wait for the spawned task to complete
         handle.await;
     });
 

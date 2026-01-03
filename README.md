@@ -1,130 +1,125 @@
-# Reactor
+# Cadentis
 
-[![Rust](https://img.shields.io/badge/Rust-1.91-orange?logo=rust)](https://www.rust-lang.org/)    
 [![License](https://img.shields.io/badge/license-SSPL-blue.svg)](LICENSE)
+![Dev Rust](https://img.shields.io/badge/Developed%20with-Rust%201.92.0-orange)
+[![CI](https://github.com/Nebula-ecosystem/Cadentis/actions/workflows/ci.yml/badge.svg)](https://github.com/Nebula-ecosystem/Cadentis/actions/workflows/ci.yml)
+
+**Cadentis** is the dedicated lightweight task orchestration runtime for the ***Nebula*** ecosystem, providing only the essential primitives required by the platform.
 
 ---
 
-**Reactor** is a lightweight, predictable event-driven runtime written in **Rust**.
+## 📊 Project Status
 
-Designed for **systems programming** and **application-level coordination**,  
-Reactor provides the fundamental building blocks to schedule, drive, and monitor  
-units of work — with or without async.
+- [x] **Runtime & Scheduling**
+  - [x] Task Spawning (async, background)
+  - [x] Event Loop (block_on, scheduling)
+  - [x] Thread-Local Context
 
-It aims to be a **clear, minimal foundation** for building custom schedulers,  
-service runtimes, and deterministic task pipelines.
+- [x] **I/O & Filesystem**
+  - [x] Async File (non-blocking read/write)
+  - [x] Async Folder (mkdir, recursive creation)
+  - [x] TCP Listener (accept connections)
+  - [x] TCP Stream (read/write, echo)
 
----
+- [x] **Reactor & Events**
+  - [x] Kqueue Integration (macOS)
+  - [x] Timer Events (sleep, timeout)
+  - [x] Event Registration (read/write/timer)
 
-# 🧩 Purpose of Reactor
+- [x] **Time & Utilities**
+  - [x] Sleep Future (async delay)
+  - [x] Timeout Combinator (deadline for tasks)
+  - [x] Time Measurement (benchmark async ops)
+  - [x] Retry Utility (repeated attempts)
 
-Modern services — networking stacks, embedded runtimes, job systems, or orchestrators —
-often need a **deterministic, observable execution loop** they control end-to-end.
+- [ ] **Multithreading**
+  - [ ] Multi-threaded Executor (work-stealing, thread pool)
+  - [ ] Thread-safe Context (Arc, Mutex)
+  - [ ] Cross-thread Task Spawning
+  - [ ] Synchronization Primitives (Mutex, Condvar, etc.)
 
-Reactor focuses on:
+- [ ] **Macros & Ergonomics**
+  - [ ] `cadentis::main` proc-macro
 
-- predictable task progression (no hidden threads)  
-- simple scheduling hooks you can extend  
-- explicit ownership of work queues and timers  
-- compatibility with both synchronous code and async primitives  
+- [ ] **Extensibility**
+  - [ ] Windows/Linux Support (epoll, IOCP)
+--
 
-This makes it a **runtime substrate** for schedulers, workers, and pipelines where
-latency budgets and ordering guarantees matter.
+## 🚀 Getting Started
 
----
+This crate is not yet published on crates.io. Add it directly from GitHub:
 
-# ✨ Key Features
-
-- 🧱 **Minimal Execution Core**  
-  Straightforward loop + queue primitives; easy to read, reason about, and extend.
-
-- ⚙️ **Deterministic Scheduling**  
-  No hidden threads; ordering and progression are explicit and testable.
-
-- 🧩 **Sync First, Async Ready**  
-  Start with synchronous tasks; evolve toward async executors as needed.
-
-- 🗂️ **Non-Blocking I/O**  
-  TCP sockets and file descriptors are opened non-blocking and driven by the reactor (kqueue).
-
-- 🚀 **Performance-Conscious**  
-  Favor O(1) enqueue/progress operations with room for instrumentation.
-
-- 🔧 **Composable Hooks**  
-  Add metrics, tracing, backpressure, or priority policies without wrestling a black box.
-
-- 🧪 **Testing-Oriented**  
-  Deterministic runs enable focused unit and integration tests for schedulers and jobs.
-
----
-
-# 🧭 Project Status
-
-🚧 **Active Development**
-
-Reactor is evolving toward a small, hackable runtime core.
-
-Current focus areas include:
-
-- single-threaded execution loop with pluggable queues  
-- task lifecycle hooks (start/finish/error)  
-- timers and delayed work primitives  
-- optional async bridge and waking strategy  
-- observability: metrics, traces, and backpressure signals  
-
-Contributions and feedback are highly encouraged.
-
----
-
-# 📦 Installation
-
-Add it to your project:
-
-```toml
+``` toml
 [dependencies]
-reactor = { git = "https://github.com/enzoblain/Async" }
+cadentis = { git = "https://github.com/Nebula-ecosystem/Cadentis" }
 ```
 
 ---
 
-# 🤝 Contributing
+## 📡 Example: TcpListener
 
-Contributions are welcome — especially regarding:
+Accept and handle an incoming TCP connection using Cadentis async I/O and task scheduling:
 
-- scheduling policies and queue strategies  
-- async integration and waking  
-- instrumentation (metrics, tracing)  
-- backpressure and cancellation  
-- documentation & examples  
+```rust
+use cadentis::net::tcp_listener::TcpListener;
+use cadentis::{RuntimeBuilder, Task};
 
-Typical workflow:
+fn main() {
+  let mut rt = RuntimeBuilder::new().enable_io().build();
 
-```sh
-cargo fmt -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo build
-cargo test
+  rt.block_on(async move {
+    let listener: TcpListener = TcpListener::bind("127.0.0.1")
+      .await
+      .expect("Failed to bind listener");
+
+    let handle = Task::spawn(async move {
+      let (stream, _) = listener.accept().await.expect("Failed to accept incoming connection");
+
+      let mut buf: [u8; 4] = [0u8; 4];
+      let n: usize = stream.read(&mut buf).await.expect("Failed to read");
+
+      if &buf[..n] == b"ping" {
+          stream.write_all(b"pong").await.expect("Failed to write");
+      }
+    }).await;
+  })
+}
 ```
 
-See `CONTRIBUTING.md` for details.
+---
+
+
+## 🦀 Rust Version
+
+- **Developed with**: Rust 1.92.0
+- **MSRV**: Rust 1.92.0 (may increase in the future)
 
 ---
 
-# 📄 License Philosophy
+## 📄 License Philosophy
 
-Reactor is licensed under the **Server Side Public License (SSPL) v1**.
+Cryptal is licensed under the **Server Side Public License (SSPL) v1**.
 
-This license ensures the runtime remains **open** while preventing  
-proprietary forks or commercial services from exploiting the project  
-without contributing back.
+This license is intentionally chosen to protect the integrity of the Nebula ecosystem.  
+While the project is fully open for **contribution, improvement, and transparency**,  
+SSPL prevents third parties from creating competing platforms, proprietary versions,  
+or commercial services derived from the project.
 
-It protects Reactor in contexts where determinism, transparency, and ecosystem integrity matter.
+Nebula is designed to grow as **one unified, community-driven network**.  
+By using SSPL, we ensure that:
 
----
+- all improvements remain open and benefit the ecosystem,  
+- the network does not fragment into multiple incompatible forks,  
+- companies cannot exploit the project without contributing back,  
+- contributors retain full access to the entire codebase.
 
-# 📬 Contact
 
-**Discord:** enzoblain  
-**Email:** enzoblain@proton.me  
+In short, SSPL ensures that Cryptal — and the Nebula ecosystem built on top of it —  
+remains **open to the community, but protected from fragmentation and exploitation**.
 
-Open to discussions, improvements, and architecture/design questions.
+## 🤝 Contact
+
+For questions, discussions, or contributions, feel free to reach out:
+
+- **Discord**: enzoblain
+- **Email**: [enzoblain@proton.me](mailto:enzoblain@proton.me)

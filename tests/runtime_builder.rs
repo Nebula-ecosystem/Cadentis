@@ -1,4 +1,4 @@
-use reactor::RuntimeBuilder;
+use cadentis::RuntimeBuilder;
 use std::sync::{Arc, Mutex};
 
 #[test]

@@ -1,36 +1,3 @@
-//! Asynchronous read and write futures for non-blocking file descriptors.
-//!
-//! These futures register the caller's waker with the reactor when the
-//! operating system reports `EAGAIN` or `EWOULDBLOCK`. Once the descriptor is
-//! ready again, the reactor wakes the task so the I/O operation can resume.
-//!
-//! # Examples
-//!
-//! Reading from a TCP stream:
-//!
-//! ```no_run
-//! use reactor::net::tcp_stream::TcpStream;
-//!
-//! # async fn read_from_stream(stream: TcpStream) -> std::io::Result<usize> {
-//! let mut buffer = [0u8; 1024];
-//! let bytes_read = stream.read(&mut buffer).await?;
-//!
-//! Ok(bytes_read)
-//! # }
-//! ```
-//!
-//! Writing to a file descriptor obtained through the runtime:
-//!
-//! ```no_run
-//! use reactor::fs::file::File;
-//!
-//! # async fn write_message(file: File) -> std::io::Result<()> {
-//! file.write(b"hello world").await?;
-//!
-//! Ok(())
-//! # }
-//! ```
-
 use crate::reactor::core::ReactorHandle;
 
 use std::future::Future;
@@ -40,26 +7,6 @@ use std::task::{Context, Poll};
 
 use libc::{EAGAIN, EWOULDBLOCK, read, write};
 
-/// Future that performs an asynchronous read on a non-blocking file descriptor.
-///
-/// Instances of this type are created by helpers such as
-/// [File::read](crate::fs::file::File::read) and
-/// [TcpStream::read](crate::net::tcp_stream::TcpStream::read). The future
-/// resolves to the number of bytes read, returning `Ok(0)` when the descriptor
-/// reaches end of stream.
-///
-/// # Examples
-///
-/// ```no_run
-/// use reactor::net::tcp_stream::TcpStream;
-///
-/// # async fn receive(stream: TcpStream) -> std::io::Result<usize> {
-/// let mut buffer = [0u8; 1024];
-/// let read = stream.read(&mut buffer).await?;
-///
-/// Ok(read)
-/// # }
-/// ```
 pub struct ReadFuture<'a> {
     file_descriptor: i32,
     buffer: &'a mut [u8],
@@ -118,24 +65,6 @@ impl<'a> Future for ReadFuture<'a> {
     }
 }
 
-/// Future that performs an asynchronous write on a non-blocking file descriptor.
-///
-/// Instances of this type are produced by helpers such as
-/// [File::write](crate::fs::file::File::write) and
-/// [TcpStream::write](crate::net::tcp_stream::TcpStream::write). The future
-/// resolves to the number of bytes successfully written.
-///
-/// # Examples
-///
-/// ```no_run
-/// use reactor::fs::file::File;
-///
-/// # async fn send(file: File) -> std::io::Result<usize> {
-/// let bytes = file.write(b"data").await?;
-///
-/// Ok(bytes)
-/// # }
-/// ```
 pub struct WriteFuture<'a> {
     file_descriptor: i32,
     buffer: &'a [u8],

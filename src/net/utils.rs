@@ -1,32 +1,9 @@
-//! Socket address parsing and conversion utilities.
-//!
-//! This module provides helper functions for converting between string-based
-//! socket addresses and libc's sockaddr_in structures.
-
 use libc::{AF_INET, in_addr, sockaddr_in};
 
 use std::io;
 use std::mem;
 use std::net::SocketAddr;
 
-/// Parses a socket address string (format: "ip:port") into a sockaddr_in.
-///
-/// # Arguments
-/// * `address` - A string in the format "192.168.1.1:8080"
-///
-/// # Returns
-/// A sockaddr_in structure or an I/O error if parsing fails
-///
-/// # Errors
-/// Returns an error if:
-/// - The address format is invalid (missing colon)
-/// - The port is not a valid u16
-/// - The IP address is not a valid IPv4 address
-///
-/// # Example
-/// ```ignore
-/// let addr = parse_sockaddr("127.0.0.1:8080")?;
-/// ```
 pub(crate) fn parse_sockaddr(address: &str) -> io::Result<sockaddr_in> {
     let (ip_string, port_string) = address
         .rsplit_once(':')
@@ -68,21 +45,6 @@ pub(crate) fn parse_sockaddr(address: &str) -> io::Result<sockaddr_in> {
     })
 }
 
-/// Converts a sockaddr_in to a [`SocketAddr`].
-///
-/// # Arguments
-/// * `address` - A reference to a sockaddr_in structure
-///
-/// # Returns
-/// A Rust [`SocketAddr`] representing the same address
-///
-/// # Example
-/// ```ignore
-/// let socket_addr = sockaddr_to_socketaddr(&addr);
-/// println!("Address: {}", socket_addr);
-/// ```
-///
-/// [`SocketAddr`]: std::net::SocketAddr
 pub(crate) fn sockaddr_to_socketaddr(address: &sockaddr_in) -> SocketAddr {
     let ip_u32 = u32::from_be(address.sin_addr.s_addr);
     let octets = [

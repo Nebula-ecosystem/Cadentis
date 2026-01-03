@@ -1,4 +1,4 @@
-use reactor::fs::Folder;
+use cadentis::fs::Folder;
 
 use std::fs;
 use std::io;
@@ -22,7 +22,7 @@ fn unique_temp_base() -> PathBuf {
 
 #[test]
 fn folder_create_single() {
-    let mut rt = reactor::RuntimeBuilder::new().build();
+    let mut rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
@@ -43,7 +43,7 @@ fn folder_create_single() {
 
 #[test]
 fn folder_create_all_nested_and_idempotent() {
-    let mut rt = reactor::RuntimeBuilder::new().build();
+    let mut rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let nested = base.join("a").join("b").join("c");
@@ -57,7 +57,6 @@ fn folder_create_all_nested_and_idempotent() {
             .expect("create_all");
         assert_eq!(folder.path(), nested_for_async);
 
-        // Idempotent: creating again should succeed
         Folder::create_all(&nested_for_async)
             .await
             .expect("create_all idempotent");
@@ -66,13 +65,12 @@ fn folder_create_all_nested_and_idempotent() {
     let meta = fs::metadata(&nested_str).expect("metadata nested");
     assert!(meta.is_dir());
 
-    // Cleanup entire tree
     fs::remove_dir_all(&base_str).expect("cleanup nested");
 }
 
 #[test]
 fn folder_create_fails_when_exists() {
-    let mut rt = reactor::RuntimeBuilder::new().build();
+    let mut rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
@@ -93,7 +91,7 @@ fn folder_create_fails_when_exists() {
 
 #[test]
 fn folder_exists_api() {
-    let mut rt = reactor::RuntimeBuilder::new().build();
+    let mut rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
@@ -106,7 +104,6 @@ fn folder_exists_api() {
         f
     });
 
-    // After deletion, exists() should be false
     fs::remove_dir(&base_str).expect("cleanup");
 
     assert!(!folder.exists());

@@ -1,36 +1,3 @@
-//! Object-oriented directory API.
-//!
-//! Provides the `Folder` type with ergonomic methods like [`Folder::create`]
-//! and [`Folder::create_all`] for working with directories.
-//!
-//! # Examples
-//!
-//! Create a single directory and reuse its path:
-//!
-//! ```no_run
-//! use reactor::fs::Folder;
-//!
-//! # async fn example() -> std::io::Result<()> {
-//! let folder = Folder::create("/tmp/reactor-demo").await?;
-//! println!("Created: {}", folder.path());
-//!
-//! Ok(())
-//! # }
-//! ```
-//!
-//! Recursively create nested directories (mkdir -p style):
-//!
-//! ```no_run
-//! use reactor::fs::Folder;
-//!
-//! # async fn example() -> std::io::Result<()> {
-//! let folder = Folder::create_all("/tmp/reactor-demo/a/b/c").await?;
-//! assert!(folder.path().ends_with("a/b/c"));
-//!
-//! Ok(())
-//! # }
-//! ```
-
 use std::io;
 
 use std::ffi::CString;
@@ -38,19 +5,11 @@ use std::path::{Component, Path, PathBuf};
 
 use libc::{EEXIST, mkdir};
 
-/// A directory handle with helper methods.
-///
-/// `Folder` encapsulates a directory path and provides constructor-style
-/// helpers to create the directory on the filesystem.
 pub struct Folder {
     path: String,
 }
 
 impl Folder {
-    /// Creates a single directory and returns a `Folder` for it.
-    ///
-    /// Fails if the directory already exists or if any parent component
-    /// is missing. For recursive creation, use [`Folder::create_all`].
     pub async fn create(path: &str) -> io::Result<Self> {
         let c_path = CString::new(path)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains null byte"))?;
@@ -66,10 +25,6 @@ impl Folder {
         })
     }
 
-    /// Recursively creates directories along `path` and returns a `Folder` for it.
-    ///
-    /// Similar to `mkdir -p`: creates intermediate directories as needed and
-    /// does not error if a directory already exists.
     pub async fn create_all(path: &str) -> io::Result<Self> {
         let target = Path::new(path);
 
@@ -127,32 +82,10 @@ impl Folder {
         })
     }
 
-    /// Returns the folder's path as a string slice.
     pub fn path(&self) -> &str {
         &self.path
     }
 
-    /// Returns whether this folder currently exists on disk and is a directory.
-    ///
-    /// This checks the underlying filesystem for the presence of a directory at
-    /// this `Folder`'s path. If the directory has been deleted after creation,
-    /// this will return `false`.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use reactor::fs::Folder;
-    ///
-    /// # async fn example() -> std::io::Result<()> {
-    /// let f = Folder::create("/tmp/reactor-exists").await?;
-    /// assert!(f.exists());
-    ///
-    /// std::fs::remove_dir(f.path()).unwrap();
-    /// assert!(!f.exists());
-    ///
-    /// Ok(())
-    /// # }
-    /// ```
     pub fn exists(&self) -> bool {
         let p = std::path::Path::new(&self.path);
         p.is_dir()

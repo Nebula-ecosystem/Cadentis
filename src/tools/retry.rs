@@ -7,16 +7,6 @@ use std::{
     time::Duration,
 };
 
-/// Creates a future that retries the provided asynchronous operation up to a given number of times.
-///
-/// # Arguments
-///
-/// * `times` - The maximum number of retry attempts.
-/// * `factory` - A closure that returns a new future for each attempt.
-///
-/// # Returns
-///
-/// A `Retry` future that resolves to the result of the operation or an error if all attempts fail.
 pub fn retry<F, G>(times: usize, factory: G) -> Retry<G, F>
 where
     G: FnMut() -> F,
@@ -25,10 +15,6 @@ where
     Retry::new(times, factory)
 }
 
-/// A future that retries an asynchronous operation multiple times.
-///
-/// This wrapper recreates the future on each retry using the provided factory closure.
-/// If the operation fails, it will be retried up to the specified number of times.
 pub struct Retry<G, F> {
     factory: G,
     future: Option<Pin<Box<F>>>,
@@ -38,12 +24,6 @@ pub struct Retry<G, F> {
 }
 
 impl<G, F> Retry<G, F> {
-    /// Creates a new `Retry` future.
-    ///
-    /// # Arguments
-    ///
-    /// * `times` - The maximum number of retry attempts.
-    /// * `factory` - A closure that returns a new future for each attempt.
     fn new(times: usize, factory: G) -> Self {
         Self {
             factory,
@@ -54,15 +34,6 @@ impl<G, F> Retry<G, F> {
         }
     }
 
-    /// Sets the interval to wait between retry attempts.
-    ///
-    /// # Arguments
-    ///
-    /// * `interval` - The duration to wait between each retry attempt.
-    ///
-    /// # Returns
-    ///
-    /// The `Retry` future with the interval configured.
     pub fn set_interval(mut self, interval: Duration) -> Self {
         self.interval = interval;
         self

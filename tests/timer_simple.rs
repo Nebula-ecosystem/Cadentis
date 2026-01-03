@@ -1,5 +1,5 @@
-use reactor::RuntimeBuilder;
-use reactor::time::sleep;
+use cadentis::RuntimeBuilder;
+use cadentis::time::sleep;
 use std::time::{Duration, Instant};
 
 #[test]
@@ -28,7 +28,6 @@ fn test_sleep_zero_duration() {
     });
     let elapsed = start.elapsed();
 
-    // Should complete almost immediately
     assert!(
         elapsed < Duration::from_millis(10),
         "Zero duration sleep should be fast"

@@ -1,11 +1,3 @@
-//! Async TCP futures for accepting connections.
-//!
-//! This module provides low-level futures for TCP operations:
-//! - [`AcceptFuture`]: Accepts a new client connection
-//! - [`ReadFuture`] and [`WriteFuture`]: Re-exported generic fd futures
-//!
-//! These futures integrate with the reactor to provide non-blocking I/O.
-
 use crate::net::utils::sockaddr_to_socketaddr;
 use crate::reactor::core::ReactorHandle;
 use crate::reactor::event::Event;
@@ -18,16 +10,6 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Re-export generic read future for convenience.
-pub use crate::reactor::future::ReadFuture;
-
-/// Re-export generic write future for convenience.
-pub use crate::reactor::future::WriteFuture;
-
-/// A future that accepts a new client connection.
-///
-/// On `EAGAIN`/`EWOULDBLOCK`, it registers the listening socket for read
-/// readiness and yields until the reactor wakes it.
 pub struct AcceptFuture {
     listen_file_descriptor: i32,
     reactor: ReactorHandle,

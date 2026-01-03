@@ -1,6 +1,6 @@
-use reactor::time::sleep;
-use reactor::time::timeout;
-use reactor::{RuntimeBuilder, Task};
+use cadentis::time::sleep;
+use cadentis::time::timeout;
+use cadentis::{RuntimeBuilder, Task};
 use std::time::Duration;
 
 #[test]

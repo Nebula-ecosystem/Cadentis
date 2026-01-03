@@ -1,4 +1,4 @@
-use reactor::{RuntimeBuilder, Task};
+use cadentis::{RuntimeBuilder, Task};
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -89,11 +89,9 @@ fn test_global_spawn_from_spawned_task() {
     let c2 = counter.clone();
 
     rt.block_on(async move {
-        // Spawn a task that itself spawns another task
         Task::spawn(async move {
             *c1.lock().unwrap() += 1;
 
-            // Spawn from within a spawned task
             Task::spawn(async move {
                 *c2.lock().unwrap() += 10;
             });
@@ -106,7 +104,6 @@ fn test_global_spawn_from_spawned_task() {
 #[test]
 #[should_panic(expected = "Task::spawn() called outside of a runtime context")]
 fn test_global_spawn_panics_outside_runtime() {
-    // Calling spawn outside of a runtime context should panic
     Task::spawn(async {
         println!("This should never run");
     });
