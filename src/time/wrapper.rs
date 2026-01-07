@@ -5,12 +5,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-pub struct Time<T: Send> {
+pub struct Time<T: Send + Sync + 'static> {
     start: Instant,
     handle: JoinHandle<T>,
 }
 
-impl<T: Send> Time<T> {
+impl<T: Send + Sync> Time<T> {
     pub fn new(handle: JoinHandle<T>) -> Self {
         Self {
             start: Instant::now(),
@@ -19,7 +19,7 @@ impl<T: Send> Time<T> {
     }
 }
 
-impl<T: Send> Future for Time<T> {
+impl<T: Send + Sync> Future for Time<T> {
     type Output = (T, Duration);
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

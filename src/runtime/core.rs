@@ -1,6 +1,6 @@
 use crate::reactor::core::{Reactor, ReactorHandle};
 use crate::runtime::{Executor, Features, TaskQueue, enter_context};
-use crate::task::Task;
+use crate::{RuntimeBuilder, Task};
 
 use std::future::Future;
 use std::sync::{Arc, Mutex};
@@ -122,6 +122,6 @@ impl Runtime {
 
 impl Default for Runtime {
     fn default() -> Self {
-        crate::builder::RuntimeBuilder::new().build()
+        RuntimeBuilder::new().build()
     }
 }
