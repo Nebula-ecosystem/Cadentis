@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 #[test]
 fn tcp_accept_and_echo() {
-    let mut rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().enable_io().build();
 
     rt.block_on(async move {
         let listener = TcpListener::bind("127.0.0.1:0")
@@ -40,7 +40,7 @@ fn tcp_accept_and_echo() {
 
 #[test]
 fn tcp_write_all_large_payload() {
-    let mut rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().enable_io().build();
 
     let payload = vec![7u8; 16 * 1024];
     let payload_len = payload.len();

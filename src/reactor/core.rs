@@ -6,6 +6,7 @@ use libc::{
     EAGAIN, EVFILT_READ, EVFILT_TIMER, EVFILT_WRITE, EWOULDBLOCK, close, kqueue, read, write,
 };
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
 use std::time::Duration;
@@ -24,7 +25,7 @@ pub struct Reactor {
     events: [Event; 64],
     n_events: i32,
     registry: HashMap<i32, Entry>,
-    timers: HashMap<usize, Waker>,
+    timers: HashMap<usize, (Waker, Arc<AtomicBool>)>,
     next_timer_id: usize,
     wakers: Vec<Waker>,
 }
@@ -62,6 +63,15 @@ impl Reactor {
     }
 
     pub(crate) fn register_timer(&mut self, duration: Duration, waker: Waker) {
+        self.register_timer_with_callback(duration, waker, Arc::new(AtomicBool::new(false)));
+    }
+
+    pub(crate) fn register_timer_with_callback(
+        &mut self,
+        duration: Duration,
+        waker: Waker,
+        expired: Arc<AtomicBool>,
+    ) {
         let milliseconds = duration.as_millis().clamp(0, isize::MAX as u128) as isize;
         let id = self.next_timer_id;
         self.next_timer_id = self.next_timer_id.wrapping_add(1).max(1);
@@ -69,17 +79,11 @@ impl Reactor {
         let event = Event::new(id, EVFILT_TIMER, Some(milliseconds));
         event.register(self.queue);
 
-        self.timers.insert(id, waker);
+        self.timers.insert(id, (waker, expired));
     }
 
     fn unregister_write(&self, file_descriptor: i32) {
         Event::unregister(self.queue, file_descriptor as usize, EVFILT_WRITE);
-    }
-
-    pub(crate) fn wait_for_event(&mut self) {
-        let n_events = Event::wait(self.queue, &mut self.events);
-
-        self.n_events = n_events;
     }
 
     pub(crate) fn poll_events(&mut self) {
@@ -178,7 +182,8 @@ impl Reactor {
                 EVFILT_TIMER => {
                     let timer_id = event.get_ident();
 
-                    if let Some(waker) = self.timers.remove(&timer_id) {
+                    if let Some((waker, expired)) = self.timers.remove(&timer_id) {
+                        expired.store(true, Ordering::Release);
                         self.wakers.push(waker);
                     }
                 }

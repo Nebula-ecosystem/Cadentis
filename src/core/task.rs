@@ -1,10 +1,11 @@
-use crate::runtime::{CURRENT_QUEUE, TaskQueue, make_waker};
+use crate::runtime::make_waker;
+use crate::runtime::workstealing::{CURRENT_INJECTOR, Injector};
 
 use std::cell::UnsafeCell;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
 pub struct Task<T: Send + Sync + 'static> {
@@ -13,31 +14,31 @@ pub struct Task<T: Send + Sync + 'static> {
     pub(crate) result: UnsafeCell<Option<T>>,
     pub(crate) completed: AtomicBool,
 
-    pub(crate) queue: Arc<TaskQueue>,
+    pub(crate) injector: Arc<Injector>,
     pub(crate) inqueue: AtomicBool,
 
-    pub(crate) waiter: UnsafeCell<Vec<Waker>>,
+    pub(crate) waiters: Mutex<Vec<Waker>>,
 }
 
 unsafe impl<T> Sync for Task<T> where T: Send + Sync + 'static {}
 
 impl<T: Send + Sync + 'static> Task<T> {
-    pub(crate) fn new<F>(fut: F, queue: Arc<TaskQueue>) -> Arc<Self>
+    pub(crate) fn new<F>(fut: F, injector: Arc<Injector>) -> Arc<Self>
     where
         F: Future<Output = T> + Send + 'static,
     {
         Arc::new(Task {
             future: UnsafeCell::new(Box::pin(fut)),
             result: UnsafeCell::new(None),
-            queue,
-            inqueue: AtomicBool::new(true),
+            injector,
+            inqueue: AtomicBool::new(false),
             completed: AtomicBool::new(false),
-            waiter: UnsafeCell::new(Vec::new()),
+            waiters: Mutex::new(Vec::new()),
         })
     }
 
     pub fn poll(self: &Arc<Self>) {
-        if self.completed.swap(false, Ordering::AcqRel) {
+        if self.completed.load(Ordering::Acquire) {
             return;
         }
 
@@ -48,9 +49,7 @@ impl<T: Send + Sync + 'static> Task<T> {
 
         match future.as_mut().poll(&mut context) {
             Poll::Pending => {
-                if !self.inqueue.swap(true, Ordering::AcqRel) {
-                    self.queue.push(self.clone());
-                }
+                self.inqueue.store(false, Ordering::Release);
             }
             Poll::Ready(val) => {
                 unsafe {
@@ -58,9 +57,11 @@ impl<T: Send + Sync + 'static> Task<T> {
                 }
 
                 self.completed.store(true, Ordering::Release);
-                self.inqueue.store(false, Ordering::Release);
 
-                unsafe { (*self.waiter.get()).drain(..) }.for_each(|w| w.wake());
+                self.injector.task_completed();
+
+                let mut waiters = self.waiters.lock().unwrap();
+                waiters.drain(..).for_each(|w| w.wake());
             }
         }
     }
@@ -69,17 +70,18 @@ impl<T: Send + Sync + 'static> Task<T> {
     where
         F: Future<Output = T> + Send + 'static,
     {
-        CURRENT_QUEUE.with(|current| {
-            let queue = current
+        CURRENT_INJECTOR.with(|cell| {
+            let injector = cell
                 .borrow()
                 .as_ref()
                 .expect("Task::spawn() called outside of a runtime context")
                 .clone();
 
-            let task = Task::new(future, queue.clone());
-            let runnable: Arc<dyn Runnable> = task.clone();
+            let task = Task::new(future, injector.clone());
+            let r: Arc<dyn Runnable> = task.clone();
 
-            queue.push(runnable);
+            task.inqueue.store(true, Ordering::Release);
+            injector.push(r);
 
             JoinHandle { task }
         })
@@ -104,13 +106,14 @@ impl<T: Send + Sync> Future for JoinHandle<T> {
     type Output = T;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.task.completed.load(Ordering::SeqCst) {
+        if self.task.completed.load(Ordering::Acquire) {
             let result = unsafe { (*self.task.result.get()).take() }.unwrap();
 
             return Poll::Ready(result);
         }
 
-        unsafe { &mut *self.task.waiter.get() }.push(cx.waker().clone());
+        let mut waiters = self.task.waiters.lock().unwrap();
+        waiters.push(cx.waker().clone());
 
         Poll::Pending
     }

@@ -1,5 +1,5 @@
 use crate::reactor::core::ReactorHandle;
-use crate::runtime::queue::TaskQueue;
+use crate::runtime::workstealing::{CURRENT_INJECTOR, Injector};
 
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -11,13 +11,12 @@ pub(crate) struct Features {
 }
 
 thread_local! {
-    pub(crate) static CURRENT_QUEUE: RefCell<Option<Arc<TaskQueue>>> = const { RefCell::new(None) };
     pub(crate) static CURRENT_REACTOR: RefCell<Option<ReactorHandle>> = const { RefCell::new(None) };
     pub(crate) static CURRENT_FEATURES: RefCell<Option<Features>> = const { RefCell::new(None) };
 }
 
 pub(crate) fn enter_context<F, R>(
-    queue: Arc<TaskQueue>,
+    injector: Arc<Injector>,
     reactor: ReactorHandle,
     features: Features,
     function: F,
@@ -25,18 +24,18 @@ pub(crate) fn enter_context<F, R>(
 where
     F: FnOnce() -> R,
 {
-    CURRENT_QUEUE.with(|current_queue| {
+    CURRENT_INJECTOR.with(|current_injector| {
         CURRENT_REACTOR.with(|current_reactor| {
             CURRENT_FEATURES.with(|current_features| {
-                let previous_queue = current_queue.borrow_mut().replace(queue.clone());
-                let previous_reactor = current_reactor.borrow_mut().replace(reactor.clone());
-                let previous_features = current_features.borrow_mut().replace(features);
+                let prev_injector = current_injector.borrow_mut().replace(injector);
+                let prev_reactor = current_reactor.borrow_mut().replace(reactor);
+                let prev_features = current_features.borrow_mut().replace(features);
 
                 let result = function();
 
-                *current_queue.borrow_mut() = previous_queue;
-                *current_reactor.borrow_mut() = previous_reactor;
-                *current_features.borrow_mut() = previous_features;
+                *current_injector.borrow_mut() = prev_injector;
+                *current_reactor.borrow_mut() = prev_reactor;
+                *current_features.borrow_mut() = prev_features;
 
                 result
             })

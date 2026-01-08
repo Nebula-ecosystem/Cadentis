@@ -22,7 +22,7 @@ fn unique_temp_base() -> PathBuf {
 
 #[test]
 fn folder_create_single() {
-    let mut rt = cadentis::RuntimeBuilder::new().build();
+    let rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
@@ -43,7 +43,7 @@ fn folder_create_single() {
 
 #[test]
 fn folder_create_all_nested_and_idempotent() {
-    let mut rt = cadentis::RuntimeBuilder::new().build();
+    let rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let nested = base.join("a").join("b").join("c");
@@ -70,7 +70,7 @@ fn folder_create_all_nested_and_idempotent() {
 
 #[test]
 fn folder_create_fails_when_exists() {
-    let mut rt = cadentis::RuntimeBuilder::new().build();
+    let rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
@@ -91,7 +91,7 @@ fn folder_create_fails_when_exists() {
 
 #[test]
 fn folder_exists_api() {
-    let mut rt = cadentis::RuntimeBuilder::new().build();
+    let rt = cadentis::RuntimeBuilder::new().build();
 
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();

@@ -47,19 +47,6 @@ impl Event {
         event.register(queue);
     }
 
-    pub(crate) fn wait(queue: i32, events: &mut [Event; 64]) -> i32 {
-        unsafe {
-            kevent(
-                queue,
-                ptr::null(),
-                0,
-                events.as_mut_ptr() as *mut kevent,
-                events.len() as i32,
-                ptr::null(),
-            )
-        }
-    }
-
     pub(crate) fn try_wait(queue: i32, events: &mut [Event; 64]) -> i32 {
         let timespec = libc::timespec {
             tv_sec: 0,

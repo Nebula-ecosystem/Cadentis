@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[test]
 fn test_retry_succeeds_before_limit() {
-    let mut rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().enable_io().build();
     let attempts = Arc::new(AtomicUsize::new(0));
     let attempts_clone = attempts.clone();
 
@@ -33,7 +33,7 @@ fn test_retry_succeeds_before_limit() {
 
 #[test]
 fn test_retry_fails_after_limit() {
-    let mut rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().enable_io().build();
     let attempts = Arc::new(AtomicUsize::new(0));
     let attempts_clone = attempts.clone();
 
@@ -62,7 +62,7 @@ fn test_retry_with_interval() {
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
-    let mut rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().enable_io().build();
     let attempts = Arc::new(AtomicUsize::new(0));
     let attempts_clone = attempts.clone();
     let last_time = Arc::new(Mutex::new(None));
@@ -116,7 +116,7 @@ fn test_timeout_with_retry() {
     use cadentis::time::timeout;
     use std::time::Duration;
 
-    let mut rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().enable_io().build();
     let attempts = Arc::new(AtomicUsize::new(0));
     let attempts_clone = attempts.clone();
 

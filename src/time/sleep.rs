@@ -3,6 +3,8 @@ use crate::runtime::context::current_reactor_io;
 
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -10,6 +12,7 @@ pub struct Sleep {
     duration: Duration,
     reactor: ReactorHandle,
     registered: bool,
+    expired: Arc<AtomicBool>,
 }
 
 impl Sleep {
@@ -22,6 +25,7 @@ impl Sleep {
             duration,
             reactor,
             registered: false,
+            expired: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -38,17 +42,21 @@ impl Future for Sleep {
             return Poll::Ready(());
         }
 
-        if !self.registered {
-            let waker = cx.waker().clone();
-            self.reactor
-                .lock()
-                .unwrap()
-                .register_timer(self.duration, waker);
-            self.registered = true;
-
-            return Poll::Pending;
+        if self.expired.load(Ordering::Acquire) {
+            return Poll::Ready(());
         }
 
-        Poll::Ready(())
+        if !self.registered {
+            let waker = cx.waker().clone();
+            let expired = self.expired.clone();
+            self.reactor.lock().unwrap().register_timer_with_callback(
+                self.duration,
+                waker,
+                expired,
+            );
+            self.registered = true;
+        }
+
+        Poll::Pending
     }
 }

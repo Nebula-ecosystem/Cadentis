@@ -1,6 +1,7 @@
 use crate::Task;
 
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::task::{RawWaker, RawWakerVTable, Waker};
 
 pub struct TaskWaker<T: Send + Sync + 'static> {
@@ -13,7 +14,9 @@ impl<T: Send + Sync + 'static> TaskWaker<T> {
     }
 
     fn wake(self: &Arc<Self>) {
-        self.task.queue.push(self.task.clone());
+        if !self.task.inqueue.swap(true, Ordering::AcqRel) {
+            self.task.injector.reschedule(self.task.clone());
+        }
     }
 
     fn clone_raw(data_ptr: *const ()) -> RawWaker {
