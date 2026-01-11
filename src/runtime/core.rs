@@ -1,37 +1,28 @@
-use crate::executor::Executor;
-use crate::executor::command::Command as ExecutorCommand;
-use crate::reactor::Reactor;
-use crate::reactor::command::Command as ReactorCommand;
-use crate::runtime::workstealing::Injector;
+use super::executor::core::Executor;
+use crate::reactor::command::Command;
+use crate::reactor::{Reactor, ReactorHandle};
 
-use std::sync::Arc;
-use std::sync::mpsc::Sender;
-use std::thread;
-
-pub struct Runtime {
-    executor_transmitter: Sender<ExecutorCommand>,
-    reactor_transmitter: Sender<ReactorCommand>,
+pub(crate) struct Runtime {
+    executor: Executor,
+    reactor_handle: ReactorHandle,
 }
 
 impl Runtime {
     pub(crate) fn new() -> Self {
-        let injector = Arc::new(Injector::new());
-        let (reactor, reactor_transmitter) = Reactor::new();
-        let (executor, executor_transmitter) = Executor::new(injector, reactor_transmitter.clone());
-
-        thread::spawn(move || reactor.run());
-        thread::spawn(move || executor.run());
+        let reactor_handle = Reactor::start();
+        let executor = Executor::new(reactor_handle.clone(), 2); // To change
 
         Self {
-            executor_transmitter,
-            reactor_transmitter,
+            executor,
+            reactor_handle,
         }
     }
 }
 
 impl Drop for Runtime {
     fn drop(&mut self) {
-        self.reactor_transmitter.send(ReactorCommand::Shutdown);
-        self.executor_transmitter.send(ExecutorCommand::Shutdown);
+        self.executor.shutdown();
+        self.reactor_handle.send(Command::Shutdown);
+        self.executor.join();
     }
 }

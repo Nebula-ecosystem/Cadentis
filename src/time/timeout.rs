@@ -5,14 +5,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
+pub(crate) fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
 where
     F: Future,
 {
     Timeout::new(duration, future)
 }
 
-pub struct Timeout<F> {
+pub(crate) struct Timeout<F> {
     future: F,
     sleep: Sleep,
 }

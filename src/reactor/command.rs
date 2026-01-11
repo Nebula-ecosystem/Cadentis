@@ -7,7 +7,7 @@ use std::sync::atomic::AtomicBool;
 use std::task::Waker;
 use std::time::Instant;
 
-pub enum Command {
+pub(crate) enum Command {
     Register {
         fd: RawFd,
         entry: IoEntry,

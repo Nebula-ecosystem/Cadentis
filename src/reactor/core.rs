@@ -12,6 +12,7 @@ use std::io;
 use std::os::fd::RawFd;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::thread;
 use std::time::Instant;
 
 pub(crate) struct Reactor {
@@ -24,27 +25,36 @@ pub(crate) struct Reactor {
     io: Slab<IoEntry>,
 }
 
+pub(crate) type ReactorHandle = Sender<Command>;
+
 impl Reactor {
-    pub(crate) fn new() -> (Self, Sender<Command>) {
-        let (transmitter, receiver) = channel();
+    fn new(receiver: Receiver<Command>) -> Self {
         let poller = Poller::new();
         let events = Vec::with_capacity(64);
         let timers = BinaryHeap::new();
         let io = Slab::new(64);
 
-        (
-            Self {
-                receiver,
-                poller,
-                events,
-                timers,
-                io,
-            },
-            transmitter,
-        )
+        Self {
+            receiver,
+            poller,
+            events,
+            timers,
+            io,
+        }
     }
 
-    pub(crate) fn run(&mut self) -> io::Result<()> {
+    pub(crate) fn start() -> ReactorHandle {
+        let (reactor_handle, rx) = channel();
+
+        thread::spawn(move || {
+            let mut reactor = Reactor::new(rx);
+            reactor.run().unwrap();
+        });
+
+        reactor_handle
+    }
+
+    fn run(&mut self) -> io::Result<()> {
         loop {
             let events: Vec<Event> = self.events.drain(..).collect();
             for event in events {

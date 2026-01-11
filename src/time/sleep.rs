@@ -12,7 +12,7 @@ pub fn sleep(duration: Duration) -> Sleep {
     Sleep::new(duration, _)
 }
 
-pub struct Sleep {
+pub(crate) struct Sleep {
     deadline: Instant,
     registered: bool,
     cancelled: Arc<AtomicBool>,

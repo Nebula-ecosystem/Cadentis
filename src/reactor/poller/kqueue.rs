@@ -17,7 +17,7 @@ pub(crate) struct KqueuePoller {
 const WAKE_IDENT: usize = 1;
 
 impl KqueuePoller {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let kqueue = unsafe { kqueue() };
         assert!(kqueue >= 0, "kqueue() failed");
 
@@ -38,7 +38,7 @@ impl KqueuePoller {
         KqueuePoller { kqueue, events }
     }
 
-    pub fn register(&self, fd: RawFd, token: usize, interest: Interest) {
+    pub(crate) fn register(&self, fd: RawFd, token: usize, interest: Interest) {
         let mut events = Vec::new();
 
         if interest.read {
@@ -75,7 +75,7 @@ impl KqueuePoller {
         }
     }
 
-    pub fn reregister(&self, fd: RawFd, token: usize, interest: Interest) {
+    pub(crate) fn reregister(&self, fd: RawFd, token: usize, interest: Interest) {
         let mut events = Vec::new();
 
         events.push(kevent {
@@ -130,7 +130,7 @@ impl KqueuePoller {
         }
     }
 
-    pub fn deregister(&self, fd: RawFd) {
+    pub(crate) fn deregister(&self, fd: RawFd) {
         let events = [
             kevent {
                 ident: fd as usize,
@@ -162,7 +162,11 @@ impl KqueuePoller {
         }
     }
 
-    pub fn poll(&mut self, events: &mut Vec<Event>, timeout: Option<Duration>) -> io::Result<()> {
+    pub(crate) fn poll(
+        &mut self,
+        events: &mut Vec<Event>,
+        timeout: Option<Duration>,
+    ) -> io::Result<()> {
         let ts;
         let timespec_ptr = match timeout {
             Some(t) => {
@@ -239,7 +243,7 @@ impl KqueuePoller {
         Ok(())
     }
 
-    pub fn wake(&self) {
+    pub(crate) fn wake(&self) {
         let event = kevent {
             ident: WAKE_IDENT,
             filter: EVFILT_USER,

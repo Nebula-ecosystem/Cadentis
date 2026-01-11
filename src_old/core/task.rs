@@ -23,20 +23,6 @@ pub struct Task<T: Send + Sync + 'static> {
 unsafe impl<T> Sync for Task<T> where T: Send + Sync + 'static {}
 
 impl<T: Send + Sync + 'static> Task<T> {
-    pub(crate) fn new<F>(fut: F, injector: Arc<Injector>) -> Arc<Self>
-    where
-        F: Future<Output = T> + Send + 'static,
-    {
-        Arc::new(Task {
-            future: UnsafeCell::new(Box::pin(fut)),
-            result: UnsafeCell::new(None),
-            injector,
-            inqueue: AtomicBool::new(false),
-            completed: AtomicBool::new(false),
-            waiters: Mutex::new(Vec::new()),
-        })
-    }
-
     pub fn poll(self: &Arc<Self>) {
         if self.completed.load(Ordering::Acquire) {
             return;

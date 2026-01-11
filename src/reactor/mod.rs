@@ -4,6 +4,6 @@ mod io;
 mod poller;
 mod timer;
 
-pub mod command;
+pub(crate) mod command;
 
-pub(crate) use core::Reactor;
+pub(crate) use core::{Reactor, ReactorHandle};
