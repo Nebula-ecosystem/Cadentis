@@ -3,21 +3,27 @@ use std::mem::MaybeUninit;
 pub(crate) struct Slab<T> {
     items: Vec<MaybeUninit<T>>,
     free: Vec<usize>,
+    used: Vec<bool>,
 }
 
 impl<T> Slab<T> {
     pub(crate) fn new(size: usize) -> Self {
         let items = (0..size).map(|_| MaybeUninit::<T>::uninit()).collect();
         let free = (0..size).collect();
+        let used = (0..size).map(|_| false).collect();
 
-        Self { items, free }
+        Self { items, free, used }
     }
 
     pub(crate) fn remove(&mut self, index: usize) -> T {
-        let item = unsafe { self.items[index].assume_init_read() };
+        assert!(index < self.items.len(), "Index out of range");
+        assert!(self.used[index], "Item is not set");
 
-        self.items[index] = MaybeUninit::uninit();
         self.free.push(index);
+        self.used[index] = false;
+
+        let item = unsafe { self.items[index].assume_init_read() };
+        self.items[index] = MaybeUninit::uninit();
 
         item
     }
@@ -32,11 +38,13 @@ impl<T> Slab<T> {
             self.items
                 .extend((len..new_len).map(|_| MaybeUninit::<T>::uninit()));
             self.free.extend((len + 1)..new_len);
+            self.used.extend((len..new_len).map(|_| false));
 
             len
         };
 
         self.items[index] = MaybeUninit::new(item);
+        self.used[index] = true;
 
         index
     }
@@ -44,15 +52,8 @@ impl<T> Slab<T> {
 
 impl<T> Drop for Slab<T> {
     fn drop(&mut self) {
-        let mut is_free = vec![false; self.items.len()];
-        for &i in &self.free {
-            if i < is_free.len() {
-                is_free[i] = true;
-            }
-        }
-
-        for (slot, &free) in self.items.iter_mut().zip(is_free.iter()) {
-            if !free {
+        for (slot, &used) in self.items.iter_mut().zip(self.used.iter()) {
+            if used {
                 unsafe {
                     slot.assume_init_drop();
                 }
