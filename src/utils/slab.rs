@@ -48,6 +48,10 @@ impl<T> Slab<T> {
 
         index
     }
+
+    pub(crate) fn get_mut(&mut self, index: usize) -> &mut T {
+        unsafe { self.items.get_mut(index).unwrap().assume_init_mut() }
+    }
 }
 
 impl<T> Drop for Slab<T> {

@@ -45,7 +45,7 @@ impl KqueuePoller {
             events.push(kevent {
                 ident: fd as usize,
                 filter: EVFILT_READ,
-                flags: EV_ADD | EV_ENABLE,
+                flags: EV_ADD | EV_ENABLE | EV_CLEAR,
                 fflags: 0,
                 data: 0,
                 udata: token as *mut _,
@@ -56,7 +56,62 @@ impl KqueuePoller {
             events.push(kevent {
                 ident: fd as usize,
                 filter: EVFILT_WRITE,
-                flags: EV_ADD | EV_ENABLE,
+                flags: EV_ADD | EV_ENABLE | EV_CLEAR,
+                fflags: 0,
+                data: 0,
+                udata: token as *mut _,
+            });
+        }
+
+        unsafe {
+            kevent(
+                self.kqueue,
+                events.as_ptr(),
+                events.len() as i32,
+                ptr::null_mut(),
+                0,
+                ptr::null(),
+            );
+        }
+    }
+
+    pub fn reregister(&self, fd: RawFd, token: usize, interest: Interest) {
+        let mut events = Vec::new();
+
+        events.push(kevent {
+            ident: fd as usize,
+            filter: EVFILT_READ,
+            flags: EV_DELETE,
+            fflags: 0,
+            data: 0,
+            udata: ptr::null_mut(),
+        });
+
+        events.push(kevent {
+            ident: fd as usize,
+            filter: EVFILT_WRITE,
+            flags: EV_DELETE,
+            fflags: 0,
+            data: 0,
+            udata: ptr::null_mut(),
+        });
+
+        if interest.read {
+            events.push(kevent {
+                ident: fd as usize,
+                filter: EVFILT_READ,
+                flags: EV_ADD | EV_ENABLE | EV_CLEAR,
+                fflags: 0,
+                data: 0,
+                udata: token as *mut _,
+            });
+        }
+
+        if interest.write {
+            events.push(kevent {
+                ident: fd as usize,
+                filter: EVFILT_WRITE,
+                flags: EV_ADD | EV_ENABLE | EV_CLEAR,
                 fflags: 0,
                 data: 0,
                 udata: token as *mut _,
