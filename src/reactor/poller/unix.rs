@@ -1,13 +1,14 @@
+use libc::{close, read, write};
 use std::os::fd::RawFd;
 
-pub(crate) fn sys_read(fd: RawFd, buf: &mut [u8]) -> isize {
-    unsafe { libc::read(fd, buf.as_mut_ptr() as *mut _, buf.len()) }
+pub(crate) fn sys_read(fd: RawFd, buffer: &mut [u8]) -> isize {
+    unsafe { read(fd, buffer.as_mut_ptr() as *mut _, buffer.len()) }
 }
 
-pub(crate) fn sys_write(fd: RawFd, buf: &mut [u8]) -> isize {
-    unsafe { libc::write(fd, buf.as_mut_ptr() as *mut _, buf.len()) }
+pub(crate) fn sys_write(fd: RawFd, buffer: &[u8]) -> isize {
+    unsafe { write(fd, buffer.as_ptr() as *mut _, buffer.len()) }
 }
 
 pub(crate) fn sys_close(fd: RawFd) {
-    unsafe { libc::close(fd) };
+    unsafe { close(fd) };
 }

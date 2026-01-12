@@ -1,5 +1,6 @@
 mod core;
 mod event;
+mod future;
 mod io;
 mod poller;
 mod timer;
