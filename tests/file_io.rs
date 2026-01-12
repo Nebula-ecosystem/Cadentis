@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn file_read_write_roundtrip() {
-    let runtime = RuntimeBuilder::new().enable_fs().build();
+    let runtime = RuntimeBuilder::new().build();
 
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -20,7 +20,7 @@ fn test_builder_feature_flags_toggle() {
     assert!(!rt.io_enabled());
     assert!(!rt.fs_enabled());
 
-    let rt = RuntimeBuilder::new().enable_io().enable_fs().build();
+    let rt = RuntimeBuilder::new().build();
     assert!(rt.io_enabled());
     assert!(rt.fs_enabled());
 }

@@ -65,7 +65,7 @@ use cadentis::net::tcp_listener::TcpListener;
 use cadentis::{RuntimeBuilder, Task};
 
 fn main() {
-  let rt = RuntimeBuilder::new().enable_io().build();
+  let rt = RuntimeBuilder::new().build();
 
   rt.block_on(async move {
     let listener: TcpListener = TcpListener::bind("127.0.0.1")
