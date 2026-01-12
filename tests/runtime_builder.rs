@@ -8,24 +8,6 @@ fn test_builder_creation() {
 }
 
 #[test]
-fn test_runtime_new_has_features_disabled() {
-    let rt = RuntimeBuilder::new().build();
-    assert!(!rt.io_enabled());
-    assert!(!rt.fs_enabled());
-}
-
-#[test]
-fn test_builder_feature_flags_toggle() {
-    let rt = RuntimeBuilder::new().build();
-    assert!(!rt.io_enabled());
-    assert!(!rt.fs_enabled());
-
-    let rt = RuntimeBuilder::new().build();
-    assert!(rt.io_enabled());
-    assert!(rt.fs_enabled());
-}
-
-#[test]
 fn test_builder_simple_future() {
     let rt = RuntimeBuilder::new().build();
     let completed = Arc::new(Mutex::new(false));

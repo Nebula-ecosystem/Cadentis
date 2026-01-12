@@ -3,9 +3,10 @@ use crate::reactor::poller::platform::{CREATEFLAGS, OPENFLAGS, sys_close, sys_op
 
 use std::ffi::CString;
 use std::io;
+use std::os::fd::RawFd;
 
 pub struct File {
-    fd: i32,
+    fd: RawFd,
 }
 
 impl File {
@@ -23,7 +24,7 @@ impl File {
         Ok(Self { fd })
     }
 
-    fn open_with_flags(c_path: CString, flags: i32) -> io::Result<i32> {
+    fn open_with_flags(c_path: CString, flags: RawFd) -> io::Result<RawFd> {
         let fd = sys_open(c_path.as_ptr(), flags, 0o644);
 
         if fd < 0 {

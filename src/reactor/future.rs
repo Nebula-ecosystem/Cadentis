@@ -2,21 +2,24 @@ use crate::reactor::command::Command;
 use crate::reactor::io::{IoEntry, Waiting};
 use crate::reactor::poller::common::Interest;
 use crate::reactor::poller::platform::{sys_read, sys_write};
+use crate::reactor::poller::unix::{sys_accept, sys_connect};
 use crate::runtime::context::CURRENT_REACTOR;
 
 use std::future::Future;
 use std::io;
+use std::net::SocketAddr;
+use std::os::fd::RawFd;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 pub struct ReadFuture<'a> {
-    fd: i32,
+    fd: RawFd,
     buffer: &'a mut [u8],
     registered: bool,
 }
 
 impl<'a> ReadFuture<'a> {
-    pub fn new(fd: i32, buffer: &'a mut [u8]) -> Self {
+    pub fn new(fd: RawFd, buffer: &'a mut [u8]) -> Self {
         Self {
             fd,
             buffer,
@@ -74,14 +77,14 @@ impl<'a> Future for ReadFuture<'a> {
 }
 
 pub struct WriteFuture<'a> {
-    fd: i32,
+    fd: RawFd,
     buffer: &'a [u8],
     written: usize,
     registered: bool,
 }
 
 impl<'a> WriteFuture<'a> {
-    pub fn new(fd: i32, buffer: &'a [u8]) -> Self {
+    pub fn new(fd: RawFd, buffer: &'a [u8]) -> Self {
         Self {
             fd,
             buffer,
@@ -146,5 +149,117 @@ impl<'a> Future for WriteFuture<'a> {
         }
 
         Poll::Ready(Ok(this.written))
+    }
+}
+
+pub struct AcceptFuture {
+    fd: RawFd,
+    registered: bool,
+}
+
+impl AcceptFuture {
+    pub(crate) fn new(fd: RawFd) -> Self {
+        Self {
+            fd,
+            registered: false,
+        }
+    }
+}
+
+impl Future for AcceptFuture {
+    type Output = io::Result<(RawFd, SocketAddr)>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        match sys_accept(this.fd) {
+            Ok((client_fd, addr)) => Poll::Ready(Ok((client_fd, addr))),
+
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
+                if !this.registered {
+                    CURRENT_REACTOR.with(|cell| {
+                        let binding = cell.borrow();
+                        let reactor = binding.as_ref().expect("no reactor in context");
+
+                        let interest = Interest {
+                            read: true,
+                            write: false,
+                        };
+
+                        let _ = reactor.send(Command::Register {
+                            fd: this.fd,
+                            interest,
+                            entry: IoEntry::Waiting(Waiting {
+                                waker: cx.waker().clone(),
+                                interest,
+                            }),
+                        });
+                    });
+
+                    this.registered = true;
+                }
+
+                Poll::Pending
+            }
+
+            Err(err) => Poll::Ready(Err(err)),
+        }
+    }
+}
+
+pub struct ConnectFuture {
+    fd: RawFd,
+    addr: SocketAddr,
+    registered: bool,
+}
+
+impl ConnectFuture {
+    pub(crate) fn new(fd: RawFd, addr: SocketAddr) -> Self {
+        Self {
+            fd,
+            addr,
+            registered: false,
+        }
+    }
+}
+
+impl Future for ConnectFuture {
+    type Output = io::Result<()>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        match sys_connect(this.fd, &this.addr) {
+            Ok(()) => Poll::Ready(Ok(())),
+
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
+                if !this.registered {
+                    CURRENT_REACTOR.with(|cell| {
+                        let binding = cell.borrow();
+                        let reactor = binding.as_ref().unwrap();
+
+                        let interest = Interest {
+                            read: false,
+                            write: true,
+                        };
+
+                        let _ = reactor.send(Command::Register {
+                            fd: this.fd,
+                            interest,
+                            entry: IoEntry::Waiting(Waiting {
+                                waker: cx.waker().clone(),
+                                interest,
+                            }),
+                        });
+                    });
+
+                    this.registered = true;
+                }
+
+                Poll::Pending
+            }
+
+            Err(err) => Poll::Ready(Err(err)),
+        }
     }
 }
