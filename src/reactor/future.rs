@@ -37,10 +37,12 @@ impl<'a> Future for ReadFuture<'a> {
         let n = sys_read(this.fd, this.buffer);
 
         if n > 0 {
+            deregister(this.fd, this.registered);
             return Poll::Ready(Ok(n as usize));
         }
 
         if n == 0 {
+            deregister(this.fd, this.registered);
             return Poll::Ready(Ok(0));
         }
 
@@ -51,6 +53,7 @@ impl<'a> Future for ReadFuture<'a> {
                 CURRENT_REACTOR.with(|cell| {
                     let binding = cell.borrow();
                     let reactor = binding.as_ref().expect("no reactor in context");
+
                     let interest = Interest {
                         read: true,
                         write: false,
@@ -72,6 +75,8 @@ impl<'a> Future for ReadFuture<'a> {
             return Poll::Pending;
         }
 
+        // ✅ FIX: deregister aussi sur erreur fatale
+        deregister(this.fd, this.registered);
         Poll::Ready(Err(err))
     }
 }
@@ -109,6 +114,7 @@ impl<'a> Future for WriteFuture<'a> {
             }
 
             if n == 0 {
+                deregister(this.fd, this.registered);
                 return Poll::Ready(Ok(this.written));
             }
 
@@ -145,9 +151,11 @@ impl<'a> Future for WriteFuture<'a> {
                 continue;
             }
 
+            deregister(this.fd, this.registered);
             return Poll::Ready(Err(err));
         }
 
+        deregister(this.fd, this.registered);
         Poll::Ready(Ok(this.written))
     }
 }
@@ -173,7 +181,10 @@ impl Future for AcceptFuture {
         let this = self.get_mut();
 
         match sys_accept(this.fd) {
-            Ok((client_fd, addr)) => Poll::Ready(Ok((client_fd, addr))),
+            Ok((client_fd, addr)) => {
+                deregister(this.fd, this.registered);
+                Poll::Ready(Ok((client_fd, addr)))
+            }
 
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
                 if !this.registered {
@@ -202,7 +213,10 @@ impl Future for AcceptFuture {
                 Poll::Pending
             }
 
-            Err(err) => Poll::Ready(Err(err)),
+            Err(err) => {
+                deregister(this.fd, this.registered);
+                Poll::Ready(Err(err))
+            }
         }
     }
 }
@@ -230,13 +244,16 @@ impl Future for ConnectFuture {
         let this = self.get_mut();
 
         match sys_connect(this.fd, &this.addr) {
-            Ok(()) => Poll::Ready(Ok(())),
+            Ok(()) => {
+                deregister(this.fd, this.registered);
+                Poll::Ready(Ok(()))
+            }
 
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
                 if !this.registered {
                     CURRENT_REACTOR.with(|cell| {
                         let binding = cell.borrow();
-                        let reactor = binding.as_ref().unwrap();
+                        let reactor = binding.as_ref().expect("no reactor in context");
 
                         let interest = Interest {
                             read: false,
@@ -259,7 +276,20 @@ impl Future for ConnectFuture {
                 Poll::Pending
             }
 
-            Err(err) => Poll::Ready(Err(err)),
+            Err(err) => {
+                deregister(this.fd, this.registered);
+                Poll::Ready(Err(err))
+            }
         }
+    }
+}
+
+fn deregister(fd: RawFd, registered: bool) {
+    if registered {
+        CURRENT_REACTOR.with(|cell| {
+            if let Some(reactor) = cell.borrow().as_ref() {
+                let _ = reactor.send(Command::Deregister { fd });
+            }
+        });
     }
 }
