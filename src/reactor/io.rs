@@ -1,11 +1,12 @@
-use std::os::fd::RawFd;
-use std::task::Waker;
-
 use crate::reactor::poller::common::Interest;
+
+use std::os::fd::RawFd;
+use std::sync::{Arc, Mutex};
+use std::task::Waker;
 
 pub(crate) enum IoEntry {
     Waiting(Waiting),
-    Stream(Stream),
+    Stream(Arc<Mutex<Stream>>),
 }
 
 impl IoEntry {
@@ -14,12 +15,18 @@ impl IoEntry {
             IoEntry::Waiting(waiting) => {
                 waiting.waker.wake();
             }
-            IoEntry::Stream(mut stream) => {
-                stream
-                    .read_waiters
-                    .drain(..)
-                    .chain(stream.write_waiters.drain(..))
-                    .for_each(|w| w.wake());
+            IoEntry::Stream(stream) => {
+                let mut stream = stream.lock().unwrap();
+
+                let read_waiters = std::mem::take(&mut stream.read_waiters);
+                for w in read_waiters {
+                    w.wake();
+                }
+
+                let write_waiters = std::mem::take(&mut stream.write_waiters);
+                for w in write_waiters {
+                    w.wake();
+                }
             }
         }
     }
@@ -30,7 +37,7 @@ pub(crate) struct Waiting {
     pub(crate) interest: Interest,
 }
 
-pub(crate) struct Stream {
+pub struct Stream {
     pub(crate) fd: RawFd,
 
     pub(crate) in_buffer: Vec<u8>,

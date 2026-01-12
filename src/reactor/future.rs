@@ -1,5 +1,5 @@
 use crate::reactor::command::Command;
-use crate::reactor::io::{IoEntry, Waiting};
+use crate::reactor::io::{IoEntry, Stream, Waiting};
 use crate::reactor::poller::common::Interest;
 use crate::reactor::poller::platform::{sys_read, sys_write};
 use crate::reactor::poller::unix::{sys_accept, sys_connect};
@@ -10,6 +10,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::os::fd::RawFd;
 use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 pub struct ReadFuture<'a> {
@@ -291,5 +292,74 @@ fn deregister(fd: RawFd, registered: bool) {
                 let _ = reactor.send(Command::Deregister { fd });
             }
         });
+    }
+}
+
+pub struct ReadFutureStream<'a> {
+    stream: Arc<Mutex<Stream>>,
+    buffer: &'a mut [u8],
+}
+
+impl<'a> ReadFutureStream<'a> {
+    pub fn new(stream: Arc<Mutex<Stream>>, buffer: &'a mut [u8]) -> Self {
+        Self { stream, buffer }
+    }
+}
+
+impl<'a> Future for ReadFutureStream<'a> {
+    type Output = io::Result<usize>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        let mut stream = this.stream.lock().unwrap();
+
+        if !stream.in_buffer.is_empty() {
+            let n = std::cmp::min(this.buffer.len(), stream.in_buffer.len());
+
+            this.buffer[..n].copy_from_slice(&stream.in_buffer[..n]);
+            stream.in_buffer.drain(..n);
+
+            return Poll::Ready(Ok(n));
+        }
+
+        stream.read_waiters.push(cx.waker().clone());
+        Poll::Pending
+    }
+}
+
+pub struct WriteFutureStream<'a> {
+    stream: Arc<Mutex<Stream>>,
+    buffer: &'a [u8],
+    written: usize,
+}
+
+impl<'a> WriteFutureStream<'a> {
+    pub fn new(stream: Arc<Mutex<Stream>>, buffer: &'a [u8]) -> Self {
+        Self {
+            stream,
+            buffer,
+            written: 0,
+        }
+    }
+}
+
+impl<'a> Future for WriteFutureStream<'a> {
+    type Output = io::Result<usize>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        if this.written == this.buffer.len() {
+            return Poll::Ready(Ok(this.written));
+        }
+
+        let mut stream = this.stream.lock().unwrap();
+        let remaining = &this.buffer[this.written..];
+        stream.out_buffer.extend_from_slice(remaining);
+
+        this.written = this.buffer.len();
+        stream.write_waiters.push(cx.waker().clone());
+
+        Poll::Pending
     }
 }
