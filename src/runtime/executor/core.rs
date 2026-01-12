@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 
 pub(crate) struct Executor {
-    reactor_handle: ReactorHandle,
     injector: Arc<Injector>,
     handles: Vec<JoinHandle<()>>,
     shutdown: Arc<AtomicBool>,
@@ -39,7 +38,6 @@ impl Executor {
         Self {
             injector,
             handles,
-            reactor_handle,
             shutdown,
         }
     }

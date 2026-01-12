@@ -1,33 +1,29 @@
 use crate::reactor::command::Command;
+use crate::runtime::context::CURRENT_REACTOR;
 
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Sender;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 pub fn sleep(duration: Duration) -> Sleep {
-    Sleep::new(duration, _)
+    Sleep::new(duration)
 }
 
-pub(crate) struct Sleep {
+pub struct Sleep {
     deadline: Instant,
     registered: bool,
     cancelled: Arc<AtomicBool>,
-    sender: Sender<Command>,
 }
 
 impl Sleep {
-    pub(crate) fn new(duration: Duration, sender: Sender<Command>) -> Self {
-        let deadline = Instant::now() + duration;
-
+    pub(crate) fn new(duration: Duration) -> Self {
         Self {
-            deadline,
+            deadline: Instant::now() + duration,
             registered: false,
             cancelled: Arc::new(AtomicBool::new(false)),
-            sender,
         }
     }
 }
@@ -35,17 +31,25 @@ impl Sleep {
 impl Future for Sleep {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.cancelled.load(Ordering::Acquire) || Instant::now() >= self.deadline {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        if this.cancelled.load(Ordering::Acquire) || Instant::now() >= this.deadline {
             return Poll::Ready(());
         }
 
-        if !self.registered {
-            self.registered = true;
-            self.sender.send(Command::SetTimer {
-                deadline: self.deadline,
-                waker: cx.waker().clone(),
-                cancelled: self.cancelled.clone(),
+        if !this.registered {
+            this.registered = true;
+
+            CURRENT_REACTOR.with(|cell| {
+                let binding = cell.borrow();
+                let reactor = binding.as_ref().expect("Sleep polled outside of runtime");
+
+                let _ = reactor.send(Command::SetTimer {
+                    deadline: this.deadline,
+                    waker: cx.waker().clone(),
+                    cancelled: this.cancelled.clone(),
+                });
             });
         }
 

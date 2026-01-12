@@ -4,6 +4,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
+pub fn instrumented<F>(future: F) -> Instrumented<F> {
+    Instrumented::new(future)
+}
+
 pub struct Instrumented<F> {
     future: F,
     elapsed_ns: AtomicU64,

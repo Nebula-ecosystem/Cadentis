@@ -148,18 +148,17 @@ impl Reactor {
                 IoEntry::Stream(stream) => {
                     fd = Some(stream.fd);
 
-                    if event.readable {
-                        if handle_read(stream.fd, &mut stream.in_buffer) {
-                            should_close = true;
-                            fd = Some(stream.fd);
-                        }
+                    if event.readable && handle_read(stream.fd, &mut stream.in_buffer) {
+                        should_close = true;
+                        fd = Some(stream.fd);
                     }
 
-                    if !should_close && event.writable {
-                        if handle_write(stream.fd, &mut stream.out_buffer) {
-                            should_close = true;
-                            fd = Some(stream.fd);
-                        }
+                    if !should_close
+                        && event.writable
+                        && handle_write(stream.fd, &mut stream.out_buffer)
+                    {
+                        should_close = true;
+                        fd = Some(stream.fd);
                     }
 
                     new_interest = Some(stream.interest());
@@ -170,10 +169,8 @@ impl Reactor {
         if let Some(fd) = fd {
             if should_close {
                 self.cleanup(event.token, fd);
-            } else {
-                if let Some(ni) = new_interest {
-                    self.poller.reregister(fd, event.token, ni);
-                }
+            } else if let Some(ni) = new_interest {
+                self.poller.reregister(fd, event.token, ni);
             }
         }
     }
