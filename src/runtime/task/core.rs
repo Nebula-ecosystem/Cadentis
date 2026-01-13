@@ -2,31 +2,42 @@ use super::state::{COMPLETED, IDLE, QUEUED, RUNNING};
 use crate::runtime::context::{CURRENT_INJECTOR, CURRENT_LOCALS, CURRENT_WORKER_ID};
 use crate::runtime::task::waker::make_waker;
 use crate::runtime::work_stealing::injector::Injector;
+use crate::task::JoinHandle;
 
 use std::cell::UnsafeCell;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::{Context, Poll};
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
 
-pub(crate) struct Task {
-    future: UnsafeCell<Pin<Box<dyn Future<Output = ()> + Send>>>,
-    pub(crate) state: AtomicUsize,
-    injector: Arc<Injector>,
+pub(crate) trait Runnable: Send + Sync {
+    fn run(self: Arc<Self>);
 }
 
-unsafe impl Send for Task {}
-unsafe impl Sync for Task {}
+pub(crate) struct Task<T> {
+    future: UnsafeCell<Pin<Box<dyn Future<Output = T> + Send>>>,
 
-impl Task {
+    pub(crate) result: UnsafeCell<Option<T>>,
+    pub(crate) state: AtomicUsize,
+
+    injector: Arc<Injector>,
+    pub(crate) waiters: Mutex<Vec<Waker>>,
+}
+
+unsafe impl<T> Send for Task<T> {}
+unsafe impl<T> Sync for Task<T> {}
+
+impl<T: Send + 'static> Task<T> {
     pub(crate) fn new<F>(future: F, injector: Arc<Injector>) -> Self
     where
-        F: Future<Output = ()> + Send + 'static,
+        F: Future<Output = T> + Send + 'static,
     {
         Self {
             future: UnsafeCell::new(Box::pin(future)),
+            result: UnsafeCell::new(None),
             state: AtomicUsize::new(QUEUED),
             injector,
+            waiters: Mutex::new(Vec::new()),
         }
     }
 
@@ -49,8 +60,17 @@ impl Task {
                 self.state.store(IDLE, Ordering::Release);
             }
 
-            Poll::Ready(()) => {
+            Poll::Ready(val) => {
+                unsafe {
+                    *self.result.get() = Some(val);
+                }
+
                 self.state.store(COMPLETED, Ordering::Release);
+
+                let waiters = self.waiters.lock().unwrap();
+                for w in waiters.iter() {
+                    w.wake_by_ref();
+                }
             }
         }
     }
@@ -66,9 +86,16 @@ impl Task {
     }
 }
 
-pub fn spawn<F>(future: F)
+impl<T: Send + 'static> Runnable for Task<T> {
+    fn run(self: Arc<Self>) {
+        Task::run(self)
+    }
+}
+
+pub fn spawn<F, T>(future: F) -> JoinHandle<T>
 where
-    F: Future<Output = ()> + Send + 'static,
+    T: Send + 'static,
+    F: Future<Output = T> + Send + 'static,
 {
     let injector = CURRENT_INJECTOR.with(|cell| {
         cell.borrow()
@@ -95,6 +122,8 @@ where
     });
 
     if !pushed_locally {
-        injector.push(task);
+        injector.push(task.clone());
     }
+
+    JoinHandle { task }
 }

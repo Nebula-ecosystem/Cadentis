@@ -1,8 +1,8 @@
 use crate::reactor::ReactorHandle;
 use crate::runtime::context::{CURRENT_WORKER_ID, enter_context};
-use crate::runtime::task::Task;
 use crate::runtime::work_stealing::injector::InjectorHandle;
 use crate::runtime::work_stealing::queue::LocalQueue;
+use crate::task::Runnable;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -62,7 +62,7 @@ impl Worker {
         }
     }
 
-    fn try_steal(&self) -> Option<Arc<Task>> {
+    fn try_steal(&self) -> Option<Arc<dyn Runnable>> {
         let len = self.locals.len();
 
         if len <= 1 {

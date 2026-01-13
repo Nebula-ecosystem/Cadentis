@@ -78,7 +78,6 @@ impl<'a> Future for ReadFuture<'a> {
             return Poll::Pending;
         }
 
-        // ✅ FIX: deregister aussi sur erreur fatale
         deregister(this.fd, this.registered);
         Poll::Ready(Err(err))
     }

@@ -1,4 +1,4 @@
-use crate::runtime::task::Task;
+use crate::runtime::task::Runnable;
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
@@ -6,7 +6,7 @@ use std::sync::{Arc, Condvar, Mutex};
 pub(crate) type InjectorHandle = Arc<Injector>;
 
 pub(crate) struct Injector {
-    queue: Mutex<VecDeque<Arc<Task>>>,
+    queue: Mutex<VecDeque<Arc<dyn Runnable>>>,
     parked: Mutex<usize>,
     condvar: Condvar,
 }
@@ -24,7 +24,7 @@ impl Injector {
         self.condvar.notify_all();
     }
 
-    pub(crate) fn push(&self, task: Arc<Task>) {
+    pub(crate) fn push(&self, task: Arc<dyn Runnable>) {
         self.queue.lock().unwrap().push_back(task);
         self.condvar.notify_one();
     }
@@ -38,7 +38,7 @@ impl Injector {
         *parked -= 1;
     }
 
-    pub(crate) fn steal(&self) -> Option<Arc<Task>> {
+    pub(crate) fn steal(&self) -> Option<Arc<dyn Runnable>> {
         self.queue.lock().unwrap().pop_front()
     }
 }
