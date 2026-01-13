@@ -1,4 +1,5 @@
 use crate::reactor::ReactorHandle;
+use crate::runtime::context::enter_context;
 use crate::runtime::executor::worker::Worker;
 use crate::runtime::task::Task;
 use crate::runtime::work_stealing::injector::Injector;
@@ -21,15 +22,24 @@ impl Executor {
 
         let mut handles = Vec::with_capacity(threads);
 
+        let mut locals = Vec::with_capacity(threads);
+        for _ in 0..threads {
+            locals.push(Arc::new(LocalQueue::new()));
+        }
+
+        let locals = Arc::new(locals);
+
         for id in 0..threads {
-            let local = LocalQueue::new();
-            let worker = Worker::new(id, local, injector.clone());
+            let worker = Worker::new(id, locals.clone(), injector.clone());
 
             let reactor = reactor_handle.clone();
             let sd = shutdown.clone();
 
+            let injector = injector.clone();
             let handle = thread::spawn(move || {
-                worker.run(sd, reactor);
+                enter_context(reactor.clone(), injector.clone(), || {
+                    worker.run(sd, reactor);
+                });
             });
 
             handles.push(handle);

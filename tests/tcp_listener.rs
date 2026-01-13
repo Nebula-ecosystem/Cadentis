@@ -1,5 +1,5 @@
 use cadentis::net::TcpListener;
-use cadentis::{RuntimeBuilder, Task};
+use cadentis::{RuntimeBuilder, task};
 use std::io::{Read, Write};
 use std::net::TcpStream as StdTcpStream;
 use std::sync::{Arc, Mutex};
@@ -13,7 +13,7 @@ fn tcp_accept_and_echo() {
         let addr = listener.local_addr().expect("local addr");
         let port = addr.port();
 
-        let handle = Task::spawn(async move {
+        let handle = task::spawn(async move {
             let (stream, _peer) = listener.accept().await.expect("accept");
             let mut buf = [0u8; 4];
             let n = stream.read(&mut buf).await.expect("read");
@@ -50,7 +50,7 @@ fn tcp_write_all_large_payload() {
         let addr = listener.local_addr().expect("local addr");
         let addr_str = format!("{}:{}", addr.ip(), addr.port());
 
-        let handle = Task::spawn(async move {
+        let handle = task::spawn(async move {
             let (stream, _peer) = listener.accept().await.expect("accept");
             stream.write_all(&payload).await.expect("write_all");
         });

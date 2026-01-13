@@ -3,6 +3,8 @@ use crate::runtime::task::Task;
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
 
+pub(crate) type InjectorHandle = Arc<Injector>;
+
 pub(crate) struct Injector {
     queue: Mutex<VecDeque<Arc<Task>>>,
     parked: Mutex<usize>,

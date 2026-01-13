@@ -68,6 +68,8 @@ impl<'a> Future for ReadFuture<'a> {
                             interest,
                         }),
                     });
+
+                    let _ = reactor.send(Command::Wake);
                 });
 
                 this.registered = true;
@@ -140,6 +142,8 @@ impl<'a> Future for WriteFuture<'a> {
                                 interest,
                             }),
                         });
+
+                        let _ = reactor.send(Command::Wake);
                     });
 
                     this.registered = true;
@@ -206,6 +210,8 @@ impl Future for AcceptFuture {
                                 interest,
                             }),
                         });
+
+                        let _ = reactor.send(Command::Wake);
                     });
 
                     this.registered = true;
@@ -269,6 +275,8 @@ impl Future for ConnectFuture {
                                 interest,
                             }),
                         });
+
+                        let _ = reactor.send(Command::Wake);
                     });
 
                     this.registered = true;
@@ -290,6 +298,7 @@ fn deregister(fd: RawFd, registered: bool) {
         CURRENT_REACTOR.with(|cell| {
             if let Some(reactor) = cell.borrow().as_ref() {
                 let _ = reactor.send(Command::Deregister { fd });
+                let _ = reactor.send(Command::Wake);
             }
         });
     }

@@ -39,6 +39,8 @@ impl TcpStream {
                 interest,
                 entry: IoEntry::Stream(stream.clone()),
             });
+
+            let _ = reactor.send(Command::Wake);
         });
 
         Self { stream }

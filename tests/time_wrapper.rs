@@ -1,6 +1,6 @@
 use cadentis::time::Time;
 use cadentis::time::sleep;
-use cadentis::{RuntimeBuilder, Task};
+use cadentis::{RuntimeBuilder, task};
 use std::time::Duration;
 
 #[test]
@@ -8,7 +8,7 @@ fn test_time_wrapper_with_sleep() {
     let rt = RuntimeBuilder::new().build();
 
     let (_, elapsed) = rt.block_on(async {
-        let handle = Task::spawn(async {
+        let handle = task::spawn(async {
             sleep(Duration::from_millis(50)).await;
         });
 

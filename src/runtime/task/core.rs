@@ -1,4 +1,5 @@
 use super::state::{COMPLETED, IDLE, QUEUED, RUNNING};
+use crate::runtime::context::{CURRENT_INJECTOR, CURRENT_LOCALS, CURRENT_WORKER_ID};
 use crate::runtime::task::waker::make_waker;
 use crate::runtime::work_stealing::injector::Injector;
 
@@ -62,5 +63,38 @@ impl Task {
         {
             self.injector.push(self.clone());
         }
+    }
+}
+
+pub fn spawn<F>(future: F)
+where
+    F: Future<Output = ()> + Send + 'static,
+{
+    let injector = CURRENT_INJECTOR.with(|cell| {
+        cell.borrow()
+            .as_ref()
+            .expect("spawn called outside of runtime")
+            .clone()
+    });
+
+    let task = Arc::new(Task::new(future, injector.clone()));
+
+    let pushed_locally = CURRENT_WORKER_ID.with(|id_cell| {
+        let id = *id_cell.borrow();
+        if let Some(id) = id {
+            CURRENT_LOCALS.with(|locals_cell| {
+                if let Some(locals) = locals_cell.borrow().as_ref() {
+                    locals[id].push(task.clone());
+                    return true;
+                }
+                false
+            })
+        } else {
+            false
+        }
+    });
+
+    if !pushed_locally {
+        injector.push(task);
     }
 }

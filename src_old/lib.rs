@@ -1,6 +1,7 @@
 mod core;
 mod reactor;
-mod runtime;
+
+pub(crate) mod runtime;
 
 pub mod fs;
 pub mod net;

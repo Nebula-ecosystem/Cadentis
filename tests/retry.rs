@@ -1,5 +1,5 @@
 use cadentis::tools::retry;
-use cadentis::{RuntimeBuilder, Task};
+use cadentis::{RuntimeBuilder, task};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -12,7 +12,7 @@ fn test_retry_succeeds_before_limit() {
     let result = rt.block_on(async {
         retry(5, || {
             let attempts_clone = attempts_clone.clone();
-            Task::spawn(async move {
+            task::spawn(async move {
                 let n = attempts_clone.fetch_add(1, Ordering::SeqCst);
                 if n < 2 { Err("fail") } else { Ok(42) }
             })
@@ -40,7 +40,7 @@ fn test_retry_fails_after_limit() {
     let result = rt.block_on(async {
         retry(3, || {
             let attempts_clone = attempts_clone.clone();
-            Task::spawn(async move {
+            task::spawn(async move {
                 attempts_clone.fetch_add(1, Ordering::SeqCst);
                 Err::<usize, _>("fail")
             })
@@ -73,7 +73,7 @@ fn test_retry_with_interval() {
         retry(3, move || {
             let attempts_clone = attempts_clone.clone();
             let last_time_clone = last_time_clone.clone();
-            Task::spawn(async move {
+            task::spawn(async move {
                 let now = Instant::now();
                 let n = attempts_clone.fetch_add(1, Ordering::SeqCst);
                 if n > 0 {
@@ -123,7 +123,7 @@ fn test_timeout_with_retry() {
     let result = rt.block_on(async {
         retry(5, || {
             let attempts_clone = attempts_clone.clone();
-            Task::spawn(async move {
+            task::spawn(async move {
                 let n = attempts_clone.fetch_add(1, Ordering::SeqCst);
                 timeout(Duration::from_millis(10), async move {
                     if n < 3 {
