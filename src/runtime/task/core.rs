@@ -1,4 +1,4 @@
-use super::state::{COMPLETED, IDLE, QUEUED, RUNNING};
+use super::state::{COMPLETED, IDLE, NOTIFIED, QUEUED, RUNNING};
 use crate::runtime::context::{CURRENT_INJECTOR, CURRENT_LOCALS, CURRENT_WORKER_ID};
 use crate::runtime::task::waker::make_waker;
 use crate::runtime::work_stealing::injector::Injector;
@@ -42,9 +42,15 @@ impl<T: Send + 'static> Task<T> {
     }
 
     pub(crate) fn run(self: Arc<Self>) {
+        let current = self.state.load(Ordering::Acquire);
+
+        if current != QUEUED && current != NOTIFIED {
+            return;
+        }
+
         if self
             .state
-            .compare_exchange(QUEUED, RUNNING, Ordering::AcqRel, Ordering::Acquire)
+            .compare_exchange(current, RUNNING, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
         {
             return;
@@ -57,7 +63,14 @@ impl<T: Send + 'static> Task<T> {
 
         match poll {
             Poll::Pending => {
-                self.state.store(IDLE, Ordering::Release);
+                if self
+                    .state
+                    .compare_exchange(RUNNING, IDLE, Ordering::AcqRel, Ordering::Acquire)
+                    .is_err()
+                {
+                    self.state.store(QUEUED, Ordering::Release);
+                    self.injector.push(self.clone());
+                }
             }
 
             Poll::Ready(val) => {
@@ -76,12 +89,34 @@ impl<T: Send + 'static> Task<T> {
     }
 
     pub fn wake(self: Arc<Self>) {
-        if self
-            .state
-            .compare_exchange(IDLE, QUEUED, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-        {
-            self.injector.push(self.clone());
+        loop {
+            let state = self.state.load(Ordering::Acquire);
+
+            match state {
+                IDLE => {
+                    if self
+                        .state
+                        .compare_exchange(IDLE, QUEUED, Ordering::AcqRel, Ordering::Acquire)
+                        .is_ok()
+                    {
+                        self.injector.push(self.clone());
+                        return;
+                    }
+                }
+                RUNNING => {
+                    if self
+                        .state
+                        .compare_exchange(RUNNING, NOTIFIED, Ordering::AcqRel, Ordering::Acquire)
+                        .is_ok()
+                    {
+                        return;
+                    }
+                }
+                QUEUED | NOTIFIED | COMPLETED => {
+                    return;
+                }
+                _ => return,
+            }
         }
     }
 }

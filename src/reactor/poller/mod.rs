@@ -1,5 +1,7 @@
 pub(crate) mod common;
 
+pub(crate) use common::Waker;
+
 #[cfg(target_os = "macos")]
 mod kqueue;
 

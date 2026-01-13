@@ -68,8 +68,6 @@ impl<'a> Future for ReadFuture<'a> {
                             interest,
                         }),
                     });
-
-                    let _ = reactor.send(Command::Wake);
                 });
 
                 this.registered = true;
@@ -141,8 +139,6 @@ impl<'a> Future for WriteFuture<'a> {
                                 interest,
                             }),
                         });
-
-                        let _ = reactor.send(Command::Wake);
                     });
 
                     this.registered = true;
@@ -209,8 +205,6 @@ impl Future for AcceptFuture {
                                 interest,
                             }),
                         });
-
-                        let _ = reactor.send(Command::Wake);
                     });
 
                     this.registered = true;
@@ -274,8 +268,6 @@ impl Future for ConnectFuture {
                                 interest,
                             }),
                         });
-
-                        let _ = reactor.send(Command::Wake);
                     });
 
                     this.registered = true;
@@ -297,7 +289,6 @@ fn deregister(fd: RawFd, registered: bool) {
         CURRENT_REACTOR.with(|cell| {
             if let Some(reactor) = cell.borrow().as_ref() {
                 let _ = reactor.send(Command::Deregister { fd });
-                let _ = reactor.send(Command::Wake);
             }
         });
     }
@@ -331,6 +322,16 @@ impl<'a> Future for ReadFutureStream<'a> {
         }
 
         stream.read_waiters.push(cx.waker().clone());
+
+        if !stream.in_buffer.is_empty() {
+            let n = std::cmp::min(this.buffer.len(), stream.in_buffer.len());
+
+            this.buffer[..n].copy_from_slice(&stream.in_buffer[..n]);
+            stream.in_buffer.drain(..n);
+
+            return Poll::Ready(Ok(n));
+        }
+
         Poll::Pending
     }
 }
@@ -356,16 +357,17 @@ impl<'a> Future for WriteFutureStream<'a> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
+        let mut stream = this.stream.lock().unwrap();
 
-        if this.written == this.buffer.len() {
+        if this.written == 0 && !this.buffer.is_empty() {
+            stream.out_buffer.extend_from_slice(this.buffer);
+            this.written = this.buffer.len();
+        }
+
+        if stream.out_buffer.is_empty() {
             return Poll::Ready(Ok(this.written));
         }
 
-        let mut stream = this.stream.lock().unwrap();
-        let remaining = &this.buffer[this.written..];
-        stream.out_buffer.extend_from_slice(remaining);
-
-        this.written = this.buffer.len();
         stream.write_waiters.push(cx.waker().clone());
 
         Poll::Pending

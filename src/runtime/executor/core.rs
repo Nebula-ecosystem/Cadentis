@@ -54,7 +54,7 @@ impl Executor {
 
     pub(crate) fn shutdown(&self) {
         self.shutdown.store(true, Ordering::Release);
-        self.injector.notify_all();
+        self.injector.shutdown();
     }
 
     pub(crate) fn spawn<F>(&self, future: F)

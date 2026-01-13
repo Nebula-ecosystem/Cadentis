@@ -24,6 +24,16 @@ impl<T> Future for JoinHandle<T> {
 
         self.task.waiters.lock().unwrap().push(cx.waker().clone());
 
+        if self.task.state.load(Ordering::Acquire) == COMPLETED {
+            let value = unsafe {
+                (*self.task.result.get())
+                    .take()
+                    .expect("result already taken")
+            };
+
+            return Poll::Ready(value);
+        }
+
         Poll::Pending
     }
 }

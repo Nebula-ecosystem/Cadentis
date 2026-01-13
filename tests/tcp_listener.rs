@@ -56,7 +56,7 @@ fn tcp_write_all_large_payload() {
         });
 
         let received_clone = received.clone();
-        std::thread::spawn(move || {
+        let client_thread = std::thread::spawn(move || {
             let mut c = StdTcpStream::connect(&addr_str).expect("connect");
             let mut buf = vec![0u8; payload_len];
             c.read_exact(&mut buf).expect("read_exact");
@@ -64,6 +64,7 @@ fn tcp_write_all_large_payload() {
         });
 
         handle.await;
+        client_thread.join().expect("client thread join");
     });
 
     assert_eq!(received_main.lock().unwrap().len(), payload_len);

@@ -2,6 +2,7 @@ use super::command::Command;
 use super::event::Event;
 use super::io::IoEntry;
 use super::poller::Poller;
+use super::poller::Waker;
 use super::poller::platform::{sys_close, sys_read, sys_write};
 use super::timer::TimerEntry;
 use crate::reactor::io::Waiting;
@@ -10,7 +11,9 @@ use crate::utils::Slab;
 use std::collections::BinaryHeap;
 use std::io;
 use std::os::fd::RawFd;
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc::SendError;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 use std::time::Instant;
@@ -25,11 +28,22 @@ pub(crate) struct Reactor {
     io: Slab<IoEntry>,
 }
 
-pub(crate) type ReactorHandle = Sender<Command>;
+#[derive(Clone)]
+pub(crate) struct ReactorHandle {
+    sender: Sender<Command>,
+    waker: Arc<Waker>,
+}
+
+impl ReactorHandle {
+    pub(crate) fn send(&self, cmd: Command) -> Result<(), SendError<Command>> {
+        let result = self.sender.send(cmd);
+        self.waker.wake();
+        result
+    }
+}
 
 impl Reactor {
-    fn new(receiver: Receiver<Command>) -> Self {
-        let poller = Poller::new();
+    fn new(receiver: Receiver<Command>, poller: Poller) -> Self {
         let events = Vec::with_capacity(64);
         let timers = BinaryHeap::new();
         let io = Slab::new(64);
@@ -44,14 +58,16 @@ impl Reactor {
     }
 
     pub(crate) fn start() -> ReactorHandle {
-        let (reactor_handle, rx) = channel();
+        let (sender, rx) = channel();
+        let poller = Poller::new();
+        let waker = poller.waker();
 
         thread::spawn(move || {
-            let mut reactor = Reactor::new(rx);
+            let mut reactor = Reactor::new(rx, poller);
             reactor.run().unwrap();
         });
 
-        reactor_handle
+        ReactorHandle { sender, waker }
     }
 
     fn run(&mut self) -> io::Result<()> {
@@ -84,13 +100,9 @@ impl Reactor {
                             waker,
                             cancelled,
                         });
-                        self.poller.wake();
                     }
                     Command::Shutdown => {
                         return Ok(());
-                    }
-                    Command::Wake => {
-                        self.poller.wake();
                     }
                 }
             }

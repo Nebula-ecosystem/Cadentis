@@ -1,9 +1,9 @@
 use super::stream::TcpStream;
 use crate::reactor::future::AcceptFuture;
 use crate::reactor::poller::platform::{
-    sys_bind, sys_close, sys_listen, sys_parse_sockaddr, sys_socket, sys_sockname,
+    sys_bind, sys_close, sys_ipv6_is_necessary, sys_listen, sys_parse_sockaddr, sys_set_reuseaddr,
+    sys_socket, sys_sockname,
 };
-use crate::reactor::poller::unix::sys_set_reuseaddr;
 
 use std::io;
 use std::net::SocketAddr;
@@ -16,9 +16,12 @@ pub struct TcpListener {
 impl TcpListener {
     pub fn bind(address: &str) -> io::Result<Self> {
         let (storage, len) = sys_parse_sockaddr(address)?;
-        let fd = sys_socket(storage.ss_family)?;
+        let domain = storage.ss_family as i32;
+
+        let fd = sys_socket(domain)?;
 
         sys_set_reuseaddr(fd)?;
+        sys_ipv6_is_necessary(fd, domain)?;
         sys_bind(fd, &storage, len)?;
         sys_listen(fd)?;
 

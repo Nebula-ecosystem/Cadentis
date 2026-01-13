@@ -1,9 +1,10 @@
 use crate::reactor::command::Command;
 use crate::reactor::future::{ConnectFuture, ReadFutureStream, WriteFutureStream};
 use crate::reactor::io::{IoEntry, Stream};
+use crate::reactor::poller::common::Interest;
 use crate::reactor::poller::platform::{
-    sockaddr_storage_to_socketaddr, sys_close, sys_parse_sockaddr, sys_set_reuseaddr, sys_shutdown,
-    sys_socket,
+    sockaddr_storage_to_socketaddr, sys_close, sys_ipv6_is_necessary, sys_parse_sockaddr,
+    sys_set_reuseaddr, sys_shutdown, sys_socket,
 };
 use crate::runtime::context::CURRENT_REACTOR;
 
@@ -29,9 +30,10 @@ impl TcpStream {
         CURRENT_REACTOR.with(|cell| {
             let binding = cell.borrow();
             let reactor = binding.as_ref().expect("no reactor in context");
-            let interest = {
-                let s = stream.lock().unwrap();
-                s.interest()
+
+            let interest = Interest {
+                read: true,
+                write: true,
             };
 
             let _ = reactor.send(Command::Register {
@@ -39,8 +41,6 @@ impl TcpStream {
                 interest,
                 entry: IoEntry::Stream(stream.clone()),
             });
-
-            let _ = reactor.send(Command::Wake);
         });
 
         Self { stream }
@@ -75,8 +75,11 @@ impl TcpStream {
         let (storage, _) = sys_parse_sockaddr(address)?;
         let addr = sockaddr_storage_to_socketaddr(&storage)?;
 
-        let fd = sys_socket(storage.ss_family)?;
+        let domain = storage.ss_family as i32;
+        let fd = sys_socket(domain)?;
+
         sys_set_reuseaddr(fd)?;
+        sys_ipv6_is_necessary(fd, domain)?;
 
         ConnectFuture::new(fd, addr).await?;
 

@@ -50,8 +50,8 @@ pub struct Stream {
 impl Stream {
     pub(crate) fn interest(&self) -> Interest {
         Interest {
-            read: !self.read_waiters.is_empty(),
-            write: !self.out_buffer.is_empty() || !self.write_waiters.is_empty(),
+            read: true,
+            write: true,
         }
     }
 }

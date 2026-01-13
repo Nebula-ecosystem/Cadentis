@@ -50,8 +50,6 @@ impl Future for Sleep {
                     waker: cx.waker().clone(),
                     cancelled: this.cancelled.clone(),
                 });
-
-                let _ = reactor.send(Command::Wake);
             });
         }
 

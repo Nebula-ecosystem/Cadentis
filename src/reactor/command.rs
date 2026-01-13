@@ -21,6 +21,5 @@ pub(crate) enum Command {
         waker: Waker,
         cancelled: Arc<AtomicBool>,
     },
-    Wake,
     Shutdown,
 }

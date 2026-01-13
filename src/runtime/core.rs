@@ -48,7 +48,6 @@ impl Drop for Runtime {
         self.executor.shutdown();
 
         let _ = self.reactor_handle.send(Command::Shutdown);
-        let _ = self.reactor_handle.send(Command::Wake);
 
         self.executor.join();
     }

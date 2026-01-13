@@ -1,17 +1,39 @@
 use super::common::Interest;
 use crate::reactor::event::Event;
+use crate::reactor::poller::Waker;
 
 use libc::{
     EV_ADD, EV_CLEAR, EV_DELETE, EV_ENABLE, EVFILT_READ, EVFILT_USER, EVFILT_WRITE, NOTE_TRIGGER,
     c_long, kevent, kqueue, time_t, timespec,
 };
 use std::os::unix::io::RawFd;
+use std::sync::Arc;
 use std::time::Duration;
 use std::{io, ptr};
 
 pub(crate) struct KqueuePoller {
     kqueue: RawFd,
     events: Vec<kevent>,
+    waker: Arc<Waker>,
+}
+
+unsafe impl Send for KqueuePoller {}
+
+impl Waker {
+    pub(crate) fn wake(&self) {
+        let event = kevent {
+            ident: WAKE_IDENT,
+            filter: EVFILT_USER,
+            flags: 0,
+            fflags: NOTE_TRIGGER,
+            data: 0,
+            udata: ptr::null_mut(),
+        };
+
+        unsafe {
+            kevent(self.0, &event, 1, ptr::null_mut(), 0, ptr::null());
+        }
+    }
 }
 
 const WAKE_IDENT: usize = 1;
@@ -34,8 +56,17 @@ impl KqueuePoller {
         assert!(ret == 0, "Failed to register EVFILT_USER");
 
         let events = Vec::with_capacity(64);
+        let waker = Arc::new(Waker(kqueue));
 
-        KqueuePoller { kqueue, events }
+        KqueuePoller {
+            kqueue,
+            events,
+            waker,
+        }
+    }
+
+    pub(crate) fn waker(&self) -> Arc<Waker> {
+        self.waker.clone()
     }
 
     pub(crate) fn register(&self, fd: RawFd, token: usize, interest: Interest) {
@@ -241,20 +272,5 @@ impl KqueuePoller {
         }
 
         Ok(())
-    }
-
-    pub(crate) fn wake(&self) {
-        let event = kevent {
-            ident: WAKE_IDENT,
-            filter: EVFILT_USER,
-            flags: 0,
-            fflags: NOTE_TRIGGER,
-            data: 0,
-            udata: ptr::null_mut(),
-        };
-
-        unsafe {
-            kevent(self.kqueue, &event, 1, ptr::null_mut(), 0, ptr::null());
-        }
     }
 }

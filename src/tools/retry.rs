@@ -84,6 +84,7 @@ where
                         this.delay = Some(Box::pin(sleep(this.interval)));
                     }
 
+                    cx.waker().wake_by_ref();
                     Poll::Pending
                 } else {
                     Poll::Ready(Err(e))

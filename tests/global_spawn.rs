@@ -8,9 +8,10 @@ fn test_global_spawn_basic() {
     let completed_clone = completed.clone();
 
     rt.block_on(async move {
-        task::spawn(async move {
+        let handle = task::spawn(async move {
             *completed_clone.lock().unwrap() = true;
         });
+        handle.await;
     });
 
     assert!(
@@ -29,17 +30,21 @@ fn test_global_spawn_multiple() {
     let c3 = counter.clone();
 
     rt.block_on(async move {
-        task::spawn(async move {
+        let h1 = task::spawn(async move {
             *c1.lock().unwrap() += 1;
         });
 
-        task::spawn(async move {
+        let h2 = task::spawn(async move {
             *c2.lock().unwrap() += 10;
         });
 
-        task::spawn(async move {
+        let h3 = task::spawn(async move {
             *c3.lock().unwrap() += 100;
         });
+
+        h1.await;
+        h2.await;
+        h3.await;
     });
 
     assert_eq!(
@@ -62,17 +67,21 @@ fn test_global_spawn_nested() {
     rt.block_on(async move {
         v0.lock().unwrap().push(1);
 
-        task::spawn(async move {
+        let h1 = task::spawn(async move {
             v1.lock().unwrap().push(2);
 
-            task::spawn(async move {
+            let h_inner = task::spawn(async move {
                 v2.lock().unwrap().push(3);
             });
+            h_inner.await;
         });
 
-        task::spawn(async move {
+        let h2 = task::spawn(async move {
             v3.lock().unwrap().push(4);
         });
+
+        h1.await;
+        h2.await;
     });
 
     let mut vals = values.lock().unwrap().clone();
@@ -89,13 +98,15 @@ fn test_global_spawn_from_spawned_task() {
     let c2 = counter.clone();
 
     rt.block_on(async move {
-        task::spawn(async move {
+        let h = task::spawn(async move {
             *c1.lock().unwrap() += 1;
 
-            task::spawn(async move {
+            let h_inner = task::spawn(async move {
                 *c2.lock().unwrap() += 10;
             });
+            h_inner.await;
         });
+        h.await;
     });
 
     assert_eq!(*counter.lock().unwrap(), 11, "Nested spawn should work");
@@ -118,15 +129,18 @@ fn test_global_spawn_with_return_values() {
     let r2 = results.clone();
 
     rt.block_on(async move {
-        task::spawn(async move {
+        let h1 = task::spawn(async move {
             let value = compute_value(5);
             r1.lock().unwrap().push(value);
         });
 
-        task::spawn(async move {
+        let h2 = task::spawn(async move {
             let value = compute_value(10);
             r2.lock().unwrap().push(value);
         });
+
+        h1.await;
+        h2.await;
     });
 
     let mut res = results.lock().unwrap().clone();
@@ -159,13 +173,16 @@ async fn do_work_with_spawn(counter: Arc<Mutex<i32>>) {
     let c1 = counter.clone();
     let c2 = counter.clone();
 
-    task::spawn(async move {
+    let h1 = task::spawn(async move {
         *c1.lock().unwrap() += 10;
     });
 
-    task::spawn(async move {
+    let h2 = task::spawn(async move {
         *c2.lock().unwrap() += 32;
     });
+
+    h1.await;
+    h2.await;
 }
 
 #[test]
@@ -192,22 +209,28 @@ async fn nested_function_a(values: Arc<Mutex<Vec<i32>>>) {
     let v1 = values.clone();
     let v2 = values.clone();
 
-    task::spawn(async move {
+    let h1 = task::spawn(async move {
         v1.lock().unwrap().push(2);
     });
 
-    nested_function_b(v2).await;
+    let h2 = nested_function_b(v2);
+
+    h1.await;
+    h2.await;
 }
 
 async fn nested_function_b(values: Arc<Mutex<Vec<i32>>>) {
     let v1 = values.clone();
     let v2 = values.clone();
 
-    task::spawn(async move {
+    let h1 = task::spawn(async move {
         v1.lock().unwrap().push(3);
     });
 
-    task::spawn(async move {
+    let h2 = task::spawn(async move {
         v2.lock().unwrap().push(4);
     });
+
+    h1.await;
+    h2.await;
 }
