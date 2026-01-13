@@ -12,6 +12,7 @@ fn test_timeout_completes_before_deadline() {
             sleep(Duration::from_millis(10)).await;
             123
         });
+
         timeout(Duration::from_millis(50), handle).await
     });
 

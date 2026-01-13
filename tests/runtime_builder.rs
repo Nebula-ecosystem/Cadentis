@@ -26,7 +26,7 @@ fn test_builder_immediate_result() {
     let rt = RuntimeBuilder::new().build();
     let value = 42;
 
-    let future = async { value };
+    let future = async move { value };
     let result = rt.block_on(future);
 
     assert_eq!(result, 42, "Future should return correct value");

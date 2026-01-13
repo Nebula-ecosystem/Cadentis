@@ -39,7 +39,7 @@ fn test_sleep_in_function() {
     let rt = RuntimeBuilder::new().build();
     let start = Instant::now();
 
-    rt.block_on(async {
+    rt.block_on(async move {
         sleep_and_record(start).await;
     });
 }

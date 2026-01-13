@@ -30,7 +30,7 @@ fn folder_create_single() {
     let base_for_async = base_str.clone();
     rt.block_on(async move {
         let dir = Dir::create(&base_for_async).await.expect("create single");
-        assert_eq!(dir.path(), base_for_async);
+        assert_eq!(dir.path(), base);
     });
 
     let meta = fs::metadata(&base_str).expect("metadata");
@@ -53,7 +53,7 @@ fn folder_create_all_nested_and_idempotent() {
         let dir = Dir::create_all(&nested_for_async)
             .await
             .expect("create_all");
-        assert_eq!(dir.path(), nested_for_async);
+        assert_eq!(dir.path(), nested);
 
         Dir::create_all(&nested_for_async)
             .await
