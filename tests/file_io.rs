@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn file_read_write_roundtrip() {
-    let runtime = RuntimeBuilder::new().enable_fs().build();
+    let runtime = RuntimeBuilder::new().build();
 
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -19,7 +19,7 @@ fn file_read_write_roundtrip() {
     let path_string = path.to_string_lossy().into_owned();
 
     runtime
-        .block_on(async {
+        .block_on(async move {
             let writer = File::create(&path_string).await?;
             writer.write_all(b"hello world").await?;
             drop(writer);

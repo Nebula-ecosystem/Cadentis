@@ -1,19 +1,14 @@
-use cadentis::time::Time;
+use cadentis::RuntimeBuilder;
+use cadentis::time::instrumented;
 use cadentis::time::sleep;
-use cadentis::{RuntimeBuilder, Task};
 use std::time::Duration;
 
 #[test]
 fn test_time_wrapper_with_sleep() {
-    let rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().build();
 
-    let (_, elapsed) = rt.block_on(async {
-        let handle = Task::spawn(async {
-            sleep(Duration::from_millis(50)).await;
-        });
-
-        Time::new(handle).await
-    });
+    let (_, elapsed) =
+        rt.block_on(async move { instrumented(sleep(Duration::from_millis(50))).await });
 
     assert!(
         elapsed >= Duration::from_millis(50),

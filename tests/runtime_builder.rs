@@ -8,24 +8,6 @@ fn test_builder_creation() {
 }
 
 #[test]
-fn test_runtime_new_has_features_disabled() {
-    let rt = RuntimeBuilder::new().build();
-    assert!(!rt.io_enabled());
-    assert!(!rt.fs_enabled());
-}
-
-#[test]
-fn test_builder_feature_flags_toggle() {
-    let rt = RuntimeBuilder::new().build();
-    assert!(!rt.io_enabled());
-    assert!(!rt.fs_enabled());
-
-    let rt = RuntimeBuilder::new().enable_io().enable_fs().build();
-    assert!(rt.io_enabled());
-    assert!(rt.fs_enabled());
-}
-
-#[test]
 fn test_builder_simple_future() {
     let rt = RuntimeBuilder::new().build();
     let completed = Arc::new(Mutex::new(false));
@@ -44,7 +26,7 @@ fn test_builder_immediate_result() {
     let rt = RuntimeBuilder::new().build();
     let value = 42;
 
-    let future = async { value };
+    let future = async move { value };
     let result = rt.block_on(future);
 
     assert_eq!(result, 42, "Future should return correct value");

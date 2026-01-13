@@ -1,16 +1,14 @@
 use crate::time::sleep;
 
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 pub fn retry<F, G>(times: usize, factory: G) -> Retry<G, F>
 where
-    G: FnMut() -> F,
-    F: Future,
+    G: FnMut() -> F + Send + 'static,
+    F: Future + Send + 'static,
 {
     Retry::new(times, factory)
 }
@@ -18,7 +16,9 @@ where
 pub struct Retry<G, F> {
     factory: G,
     future: Option<Pin<Box<F>>>,
-    delay: Option<Pin<Box<dyn Future<Output = ()>>>>,
+
+    delay: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
+
     remaining: usize,
     interval: Duration,
 }
@@ -42,13 +42,13 @@ impl<G, F> Retry<G, F> {
 
 impl<G, F, T, E> Future for Retry<G, F>
 where
-    G: FnMut() -> F,
-    F: Future<Output = Result<T, E>> + 'static,
+    G: FnMut() -> F + Send + Unpin + 'static,
+    F: Future<Output = Result<T, E>> + Send + 'static,
 {
     type Output = Result<T, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = unsafe { self.get_unchecked_mut() };
+        let this = self.get_mut();
 
         if let Some(delay) = this.delay.as_mut() {
             match delay.as_mut().poll(cx) {
@@ -60,7 +60,8 @@ where
         }
 
         if this.future.is_none() {
-            this.future = Some(Box::pin((this.factory)()));
+            let fut = (this.factory)();
+            this.future = Some(Box::pin(fut));
         }
 
         let fut = this.future.as_mut().unwrap();
@@ -84,7 +85,6 @@ where
                     }
 
                     cx.waker().wake_by_ref();
-
                     Poll::Pending
                 } else {
                     Poll::Ready(Err(e))

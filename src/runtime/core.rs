@@ -1,156 +1,54 @@
-use crate::core::task::Runnable;
-use crate::reactor::core::{Reactor, ReactorHandle};
-use crate::runtime::workstealing::Injector;
-use crate::runtime::{Executor, Features, enter_context};
-use crate::{RuntimeBuilder, Task};
+use std::sync::mpsc;
 
-use std::future::Future;
-use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
+use super::executor::core::Executor;
+use crate::reactor::command::Command;
+use crate::reactor::{Reactor, ReactorHandle};
 
 pub struct Runtime {
-    injector: Arc<Injector>,
-    reactor: ReactorHandle,
-    io_enabled: bool,
-    fs_enabled: bool,
+    executor: Executor,
+    reactor_handle: ReactorHandle,
 }
 
 impl Runtime {
-    pub(crate) fn with_features(io_enabled: bool, fs_enabled: bool) -> Self {
-        let injector = Arc::new(Injector::new());
-        let reactor = Arc::new(Mutex::new(Reactor::new()));
-
-        let features = Features {
-            io_enabled,
-            fs_enabled,
-        };
-
-        let mut executor = Executor::new(injector.clone(), reactor.clone(), features);
-
-        executor.start();
+    pub(crate) fn new() -> Self {
+        let reactor_handle = Reactor::start();
+        let executor = Executor::new(reactor_handle.clone(), 2); // To change
 
         Self {
-            injector,
-            reactor,
-            io_enabled,
-            fs_enabled,
+            executor,
+            reactor_handle,
         }
     }
 
-    pub fn spawn<F: Future<Output = ()> + Send + 'static>(&self, future: F) {
-        let injector = self.injector.clone();
-        let task = Task::new(future, injector.clone());
-        let r: Arc<dyn Runnable> = task.clone();
-        task.inqueue.store(true, Ordering::Release);
-        injector.push(r);
+    pub fn spawn<F>(&self, future: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        self.executor.spawn(future);
     }
 
-    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
-        let features = Features {
-            io_enabled: self.io_enabled,
-            fs_enabled: self.fs_enabled,
-        };
+    pub fn block_on<F>(&self, future: F) -> F::Output
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let (transmitter, receiver) = mpsc::channel();
 
-        enter_context(
-            self.injector.clone(),
-            self.reactor.clone(),
-            features,
-            || {
-                let mut future = Box::pin(future);
-                let mut is_notified = false;
-                let mut root_done = false;
-                let mut root_value = None;
+        self.spawn(async move {
+            let result = future.await;
+            let _ = transmitter.send(result);
+        });
 
-                fn clone_waker(data: *const ()) -> std::task::RawWaker {
-                    std::task::RawWaker::new(data, &VTABLE)
-                }
-                fn wake(data: *const ()) {
-                    unsafe {
-                        *(data as *mut bool) = true;
-                    }
-                }
-                fn wake_by_ref(data: *const ()) {
-                    unsafe {
-                        *(data as *mut bool) = true;
-                    }
-                }
-                fn drop_waker(_: *const ()) {}
-
-                static VTABLE: std::task::RawWakerVTable =
-                    std::task::RawWakerVTable::new(clone_waker, wake, wake_by_ref, drop_waker);
-
-                let raw =
-                    std::task::RawWaker::new(&mut is_notified as *mut bool as *const (), &VTABLE);
-                let waker = unsafe { std::task::Waker::from_raw(raw) };
-                let mut cx = Context::from_waker(&waker);
-
-                loop {
-                    if !root_done && let Poll::Ready(v) = future.as_mut().poll(&mut cx) {
-                        root_done = true;
-                        root_value = Some(v);
-                    }
-
-                    {
-                        let mut r = self.reactor.lock().unwrap();
-                        r.poll_events();
-                        r.wake_ready();
-                    }
-
-                    if root_done && self.injector.is_idle() {
-                        return root_value.unwrap();
-                    }
-
-                    while let Some(task) = self.injector.pop() {
-                        task.poll();
-
-                        {
-                            let mut r = self.reactor.lock().unwrap();
-                            r.poll_events();
-                            r.wake_ready();
-                        }
-
-                        if root_done && self.injector.is_idle() {
-                            return root_value.unwrap();
-                        }
-                    }
-
-                    if root_done && self.injector.is_idle() {
-                        return root_value.unwrap();
-                    }
-
-                    if is_notified {
-                        is_notified = false;
-                        continue;
-                    }
-
-                    std::thread::yield_now();
-                }
-            },
-        )
-    }
-
-    pub fn reactor_handle(&self) -> ReactorHandle {
-        self.reactor.clone()
-    }
-
-    pub fn io_enabled(&self) -> bool {
-        self.io_enabled
-    }
-
-    pub fn fs_enabled(&self) -> bool {
-        self.fs_enabled
+        receiver.recv().expect("block_on failed")
     }
 }
 
 impl Drop for Runtime {
     fn drop(&mut self) {
-        self.injector.shutdown();
-    }
-}
+        self.executor.shutdown();
 
-impl Default for Runtime {
-    fn default() -> Self {
-        RuntimeBuilder::new().build()
+        let _ = self.reactor_handle.send(Command::Shutdown);
+
+        self.executor.join();
     }
 }

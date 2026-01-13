@@ -1,17 +1,18 @@
 use cadentis::time::sleep;
 use cadentis::time::timeout;
-use cadentis::{RuntimeBuilder, Task};
+use cadentis::{RuntimeBuilder, task};
 use std::time::Duration;
 
 #[test]
 fn test_timeout_completes_before_deadline() {
-    let rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().build();
 
     let result = rt.block_on(async {
-        let handle = Task::spawn(async {
+        let handle = task::spawn(async {
             sleep(Duration::from_millis(10)).await;
             123
         });
+
         timeout(Duration::from_millis(50), handle).await
     });
 
@@ -23,10 +24,10 @@ fn test_timeout_completes_before_deadline() {
 
 #[test]
 fn test_timeout_expires() {
-    let rt = RuntimeBuilder::new().enable_io().build();
+    let rt = RuntimeBuilder::new().build();
 
     let result = rt.block_on(async {
-        let handle = Task::spawn(async {
+        let handle = task::spawn(async {
             sleep(Duration::from_millis(100)).await;
             456
         });

@@ -1,4 +1,4 @@
-use cadentis::fs::Folder;
+use cadentis::fs::Dir;
 
 use std::fs;
 use std::io;
@@ -29,10 +29,8 @@ fn folder_create_single() {
 
     let base_for_async = base_str.clone();
     rt.block_on(async move {
-        let folder = Folder::create(&base_for_async)
-            .await
-            .expect("create single");
-        assert_eq!(folder.path(), base_for_async);
+        let dir = Dir::create(&base_for_async).await.expect("create single");
+        assert_eq!(dir.path(), base);
     });
 
     let meta = fs::metadata(&base_str).expect("metadata");
@@ -52,12 +50,12 @@ fn folder_create_all_nested_and_idempotent() {
 
     let nested_for_async = nested_str.clone();
     rt.block_on(async move {
-        let folder = Folder::create_all(&nested_for_async)
+        let dir = Dir::create_all(&nested_for_async)
             .await
             .expect("create_all");
-        assert_eq!(folder.path(), nested_for_async);
+        assert_eq!(dir.path(), nested);
 
-        Folder::create_all(&nested_for_async)
+        Dir::create_all(&nested_for_async)
             .await
             .expect("create_all idempotent");
     });
@@ -77,9 +75,9 @@ fn folder_create_fails_when_exists() {
 
     let base_for_async = base_str.clone();
     rt.block_on(async move {
-        Folder::create(&base_for_async).await.expect("first create");
+        Dir::create(&base_for_async).await.expect("first create");
 
-        let err = Folder::create(&base_for_async)
+        let err = Dir::create(&base_for_async)
             .await
             .err()
             .expect("expected error");
@@ -97,8 +95,8 @@ fn folder_exists_api() {
     let base_str = base.to_string_lossy().into_owned();
 
     let base_for_async = base_str.clone();
-    let folder: Folder = rt.block_on(async move {
-        let f = Folder::create(&base_for_async).await.expect("create");
+    let dir: Dir = rt.block_on(async move {
+        let f = Dir::create(&base_for_async).await.expect("create");
         assert!(f.exists());
 
         f
@@ -106,5 +104,5 @@ fn folder_exists_api() {
 
     fs::remove_dir(&base_str).expect("cleanup");
 
-    assert!(!folder.exists());
+    assert!(!dir.exists());
 }

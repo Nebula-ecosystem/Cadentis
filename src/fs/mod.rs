@@ -1,5 +1,5 @@
-pub mod file;
-pub mod folder;
+mod dir;
+mod file;
 
+pub use dir::Dir;
 pub use file::File;
-pub use folder::Folder;

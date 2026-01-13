@@ -1,10 +1,9 @@
-use crate::reactor::core::ReactorHandle;
-use crate::runtime::context::current_reactor_io;
+use crate::time::sleep::{Sleep, sleep};
 
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
 where
@@ -15,49 +14,34 @@ where
 
 pub struct Timeout<F> {
     future: F,
-    deadline: Instant,
-    duration: Duration,
-    reactor: ReactorHandle,
-    registered: bool,
+    sleep: Sleep,
 }
 
 impl<F> Timeout<F> {
     pub(crate) fn new(duration: Duration, future: F) -> Self {
         Timeout {
             future,
-            deadline: Instant::now() + duration,
-            duration,
-            reactor: current_reactor_io(),
-            registered: false,
+            sleep: sleep(duration),
         }
     }
 }
-
-impl<F: Future> Future for Timeout<F> {
+impl<F> Future for Timeout<F>
+where
+    F: Future,
+{
     type Output = Result<F::Output, ()>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if Instant::now() >= self.deadline {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = unsafe { self.get_unchecked_mut() };
+
+        let future = unsafe { Pin::new_unchecked(&mut this.future) };
+        if let Poll::Ready(val) = future.poll(cx) {
+            return Poll::Ready(Ok(val));
+        }
+
+        let sleep = unsafe { Pin::new_unchecked(&mut this.sleep) };
+        if let Poll::Ready(()) = sleep.poll(cx) {
             return Poll::Ready(Err(()));
-        }
-
-        let future = unsafe { self.as_mut().map_unchecked_mut(|s| &mut s.future) };
-        if let Poll::Ready(v) = future.poll(cx) {
-            return Poll::Ready(Ok(v));
-        }
-
-        if !self.registered {
-            let waker = cx.waker().clone();
-
-            self.reactor
-                .lock()
-                .unwrap()
-                .register_timer(self.duration, waker);
-
-            unsafe {
-                let this = self.get_unchecked_mut();
-                this.registered = true;
-            }
         }
 
         Poll::Pending

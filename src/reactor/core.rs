@@ -1,265 +1,249 @@
-use crate::reactor::event::Event;
-use crate::reactor::io::{Connection, ConnectionState};
-use crate::reactor::socket::accept_client;
+use super::command::Command;
+use super::event::Event;
+use super::io::IoEntry;
+use super::poller::Poller;
+use super::poller::Waker;
+use super::poller::platform::{sys_close, sys_read, sys_write};
+use super::timer::TimerEntry;
+use crate::reactor::io::Waiting;
+use crate::utils::Slab;
 
-use libc::{
-    EAGAIN, EVFILT_READ, EVFILT_TIMER, EVFILT_WRITE, EWOULDBLOCK, close, kqueue, read, write,
-};
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::task::Waker;
-use std::time::Duration;
+use std::collections::BinaryHeap;
+use std::io;
+use std::os::fd::RawFd;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc::SendError;
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::thread;
+use std::time::Instant;
 
-pub type ReactorHandle = Arc<Mutex<Reactor>>;
+pub(crate) struct Reactor {
+    receiver: Receiver<Command>,
 
-pub(crate) enum Entry {
-    #[allow(unused)]
-    Listener,
-    Client(Connection),
-    Waiting(Waker),
+    poller: Poller,
+    events: Vec<Event>,
+
+    timers: BinaryHeap<TimerEntry>,
+    io: Slab<IoEntry>,
 }
 
-pub struct Reactor {
-    queue: i32,
-    events: [Event; 64],
-    n_events: i32,
-    registry: HashMap<i32, Entry>,
-    timers: HashMap<usize, (Waker, Arc<AtomicBool>)>,
-    next_timer_id: usize,
-    wakers: Vec<Waker>,
+#[derive(Clone)]
+pub(crate) struct ReactorHandle {
+    sender: Sender<Command>,
+    waker: Arc<Waker>,
 }
 
-unsafe impl Send for Reactor {}
-unsafe impl Sync for Reactor {}
-
-const OUT_MAX_BYTES: usize = 8 * 1024 * 1024;
+impl ReactorHandle {
+    pub(crate) fn send(&self, cmd: Command) -> Result<(), SendError<Command>> {
+        let result = self.sender.send(cmd);
+        self.waker.wake();
+        result
+    }
+}
 
 impl Reactor {
-    pub(crate) fn new() -> Self {
+    fn new(receiver: Receiver<Command>, poller: Poller) -> Self {
+        let events = Vec::with_capacity(64);
+        let timers = BinaryHeap::new();
+        let io = Slab::new(64);
+
         Self {
-            queue: unsafe { kqueue() },
-            events: [Event::EMPTY; 64],
-            n_events: 0,
-            registry: HashMap::new(),
-            timers: HashMap::new(),
-            next_timer_id: 1,
-            wakers: Vec::new(),
+            receiver,
+            poller,
+            events,
+            timers,
+            io,
         }
     }
 
-    pub(crate) fn register_read(&mut self, file_descriptor: i32, waker: Waker) {
-        let event = Event::new(file_descriptor as usize, EVFILT_READ, None);
-        event.register(self.queue);
+    pub(crate) fn start() -> ReactorHandle {
+        let (sender, rx) = channel();
+        let poller = Poller::new();
+        let waker = poller.waker();
 
-        self.registry.insert(file_descriptor, Entry::Waiting(waker));
+        thread::spawn(move || {
+            let mut reactor = Reactor::new(rx, poller);
+            reactor.run().unwrap();
+        });
+
+        ReactorHandle { sender, waker }
     }
 
-    pub(crate) fn register_write(&mut self, file_descriptor: i32, waker: Waker) {
-        let event = Event::new(file_descriptor as usize, EVFILT_WRITE, None);
-        event.register(self.queue);
+    fn run(&mut self) -> io::Result<()> {
+        loop {
+            let events: Vec<Event> = self.events.drain(..).collect();
+            for event in events {
+                self.handle_event(event);
+            }
 
-        self.registry.insert(file_descriptor, Entry::Waiting(waker));
-    }
-
-    pub(crate) fn register_timer(&mut self, duration: Duration, waker: Waker) {
-        self.register_timer_with_callback(duration, waker, Arc::new(AtomicBool::new(false)));
-    }
-
-    pub(crate) fn register_timer_with_callback(
-        &mut self,
-        duration: Duration,
-        waker: Waker,
-        expired: Arc<AtomicBool>,
-    ) {
-        let milliseconds = duration.as_millis().clamp(0, isize::MAX as u128) as isize;
-        let id = self.next_timer_id;
-        self.next_timer_id = self.next_timer_id.wrapping_add(1).max(1);
-
-        let event = Event::new(id, EVFILT_TIMER, Some(milliseconds));
-        event.register(self.queue);
-
-        self.timers.insert(id, (waker, expired));
-    }
-
-    fn unregister_write(&self, file_descriptor: i32) {
-        Event::unregister(self.queue, file_descriptor as usize, EVFILT_WRITE);
-    }
-
-    pub(crate) fn poll_events(&mut self) {
-        let n_events = Event::try_wait(self.queue, &mut self.events);
-
-        if n_events <= 0 {
-            return;
-        }
-
-        self.n_events = n_events;
-        self.handle_events();
-    }
-
-    pub(crate) fn wake_ready(&mut self) {
-        for waker in self.wakers.drain(..) {
-            waker.wake();
-        }
-    }
-
-    pub(crate) fn handle_events(&mut self) {
-        for event in self.events.iter().take(self.n_events as usize) {
-            let file_descriptor = event.get_ident() as i32;
-            let filter = event.get_filter();
-
-            match filter {
-                EVFILT_READ
-                    if matches!(self.registry.get(&(file_descriptor)), Some(Entry::Listener)) =>
-                {
-                    accept_client(self.queue, &mut self.registry, file_descriptor);
-                }
-
-                EVFILT_READ => {
-                    let mut entry = match self.registry.remove(&file_descriptor) {
-                        Some(entry) => entry,
-                        None => continue,
-                    };
-
-                    match &mut entry {
-                        Entry::Waiting(waker) => {
-                            self.wakers.push(waker.clone());
-                            self.registry.insert(file_descriptor, entry);
-                            continue;
-                        }
-                        Entry::Client(connection)
-                            if matches!(connection.state, ConnectionState::Reading) =>
-                        {
-                            let should_close = self.handle_read(file_descriptor, connection);
-
-                            if should_close {
-                                self.cleanup(file_descriptor);
-                            } else {
-                                self.registry.insert(file_descriptor, entry);
-                            }
-                        }
-                        Entry::Client(_) => {
-                            self.registry.insert(file_descriptor, entry);
-                        }
-                        _ => {
-                            self.cleanup(file_descriptor);
-                        }
+            while let Ok(cmd) = self.receiver.try_recv() {
+                match cmd {
+                    Command::Register {
+                        fd,
+                        interest,
+                        entry,
+                    } => {
+                        let token = self.io.insert(entry);
+                        self.poller.register(fd, token, interest);
+                    }
+                    Command::Deregister { fd } => {
+                        self.poller.deregister(fd);
+                    }
+                    Command::SetTimer {
+                        deadline,
+                        waker,
+                        cancelled,
+                    } => {
+                        self.timers.push(TimerEntry {
+                            deadline,
+                            waker,
+                            cancelled,
+                        });
+                    }
+                    Command::Shutdown => {
+                        return Ok(());
                     }
                 }
+            }
 
-                EVFILT_WRITE => {
-                    let mut entry = match self.registry.remove(&file_descriptor) {
-                        Some(entry) => entry,
-                        None => continue,
-                    };
+            let timeout = self
+                .timers
+                .peek()
+                .map(|t| t.deadline.saturating_duration_since(Instant::now()));
 
-                    match &mut entry {
-                        Entry::Waiting(waker) => {
-                            self.wakers.push(waker.clone());
-                            self.registry.insert(file_descriptor, entry);
-                            continue;
-                        }
-                        Entry::Client(connection)
-                            if matches!(connection.state, ConnectionState::Writing) =>
-                        {
-                            let should_close = self.handle_write(file_descriptor, connection);
+            self.poller.poll(&mut self.events, timeout)?;
 
-                            if should_close {
-                                self.cleanup(file_descriptor);
-                            } else {
-                                self.registry.insert(file_descriptor, entry);
-                            }
-                        }
-                        Entry::Client(_) => {
-                            self.registry.insert(file_descriptor, entry);
-                        }
-                        _ => {
-                            self.cleanup(file_descriptor);
-                        }
-                    }
+            let now = Instant::now();
+            while let Some(timer) = self.timers.peek() {
+                if timer.deadline > now {
+                    break;
                 }
 
-                EVFILT_TIMER => {
-                    let timer_id = event.get_ident();
+                let timer = self.timers.pop().unwrap();
 
-                    if let Some((waker, expired)) = self.timers.remove(&timer_id) {
-                        expired.store(true, Ordering::Release);
-                        self.wakers.push(waker);
-                    }
+                if timer.cancelled.load(Ordering::Acquire) {
+                    continue;
                 }
 
-                _ => {}
+                timer.waker.wake();
             }
         }
     }
 
-    fn handle_read(&self, file_descriptor: i32, connection: &mut Connection) -> bool {
-        let mut buffer = [0u8; 1024];
-        let result = unsafe { read(file_descriptor, buffer.as_mut_ptr() as *mut _, buffer.len()) };
+    fn handle_event(&mut self, event: Event) {
+        let mut should_close = false;
+        let mut fd = None;
+        let mut new_interest = None;
 
-        if result == 0 {
-            return true;
-        }
+        {
+            let entry = self.io.get_mut(event.token);
 
-        if result < 0 {
-            let error = get_errno();
+            match entry {
+                IoEntry::Waiting(Waiting { waker, interest }) => {
+                    let mut woke = false;
 
-            if error == EAGAIN || error == EWOULDBLOCK {
-                return false;
+                    if event.readable && interest.read {
+                        waker.wake_by_ref();
+                        woke = true;
+                    }
+
+                    if event.writable && interest.write {
+                        waker.wake_by_ref();
+                        woke = true;
+                    }
+
+                    if woke {
+                        self.io.remove(event.token);
+                    }
+                }
+
+                IoEntry::Stream(stream) => {
+                    let mut stream = stream.lock().unwrap();
+
+                    fd = Some(stream.fd);
+
+                    if event.readable {
+                        if handle_read(stream.fd, &mut stream.in_buffer) {
+                            should_close = true;
+                        } else {
+                            stream.read_waiters.drain(..).for_each(|w| w.wake());
+                        }
+                    }
+
+                    if !should_close && event.writable {
+                        if handle_write(stream.fd, &mut stream.out_buffer) {
+                            should_close = true;
+                        } else if stream.out_buffer.is_empty() {
+                            stream.write_waiters.drain(..).for_each(|w| w.wake());
+                        }
+                    }
+
+                    new_interest = Some(stream.interest());
+                }
             }
-
-            return true;
         }
 
-        let bytes_read = result as usize;
-
-        if connection.out.len().saturating_add(bytes_read) > OUT_MAX_BYTES {
-            return true;
-        }
-
-        connection.out.extend_from_slice(&buffer[..bytes_read]);
-        connection.state = ConnectionState::Writing;
-
-        false
-    }
-
-    fn handle_write(&self, file_descriptor: i32, connection: &mut Connection) -> bool {
-        let result = unsafe {
-            write(
-                file_descriptor,
-                connection.out.as_mut_ptr() as *mut _,
-                connection.out.len(),
-            )
-        };
-
-        if result < 0 {
-            let error = get_errno();
-
-            if error == EAGAIN || error == EWOULDBLOCK {
-                return false;
+        if let Some(fd) = fd {
+            if should_close {
+                self.cleanup(event.token, fd);
+            } else if let Some(ni) = new_interest {
+                self.poller.reregister(fd, event.token, ni);
             }
-
-            return true;
         }
-
-        let bytes_written = result as usize;
-        connection.out.drain(..bytes_written);
-
-        if connection.out.is_empty() {
-            self.unregister_write(file_descriptor);
-            connection.state = ConnectionState::Reading;
-        }
-
-        false
     }
+    fn cleanup(&mut self, token: usize, fd: RawFd) {
+        self.poller.deregister(fd);
+        self.io.remove(token).wake_all();
 
-    fn cleanup(&self, file_descriptor: i32) {
-        Event::unregister(self.queue, file_descriptor as usize, EVFILT_READ);
-        Event::unregister(self.queue, file_descriptor as usize, EVFILT_WRITE);
-        unsafe { close(file_descriptor) };
+        sys_close(fd);
     }
 }
 
-pub(crate) fn get_errno() -> i32 {
-    unsafe { *libc::__error() }
+fn handle_read(fd: RawFd, buffer: &mut Vec<u8>) -> bool {
+    let mut temp = [0u8; 1024];
+
+    loop {
+        let n = sys_read(fd, &mut temp);
+
+        match n {
+            (1..) => {
+                buffer.extend_from_slice(&temp[..n as usize]);
+            }
+            0 => {
+                return true;
+            }
+            _ => {
+                let error = io::Error::last_os_error();
+
+                if error.kind() == io::ErrorKind::WouldBlock {
+                    break;
+                } else {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+fn handle_write(fd: RawFd, buffer: &mut Vec<u8>) -> bool {
+    while !buffer.is_empty() {
+        let n = sys_write(fd, buffer);
+
+        if n > 0 {
+            buffer.drain(..n as usize);
+        } else if n < 0 {
+            let err = io::Error::last_os_error();
+
+            if err.kind() == io::ErrorKind::WouldBlock {
+                break;
+            } else {
+                return true;
+            }
+        }
+    }
+
+    false
 }

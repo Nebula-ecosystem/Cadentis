@@ -33,10 +33,11 @@
   - [x] Retry Utility (repeated attempts)
 
 - [ ] **Multithreading**
-  - [ ] Multi-threaded Executor (work-stealing, thread pool)
-  - [ ] Thread-safe Context (Arc, Mutex)
-  - [ ] Cross-thread Task Spawning
-  - [ ] Synchronization Primitives (Mutex, Condvar, etc.)
+  - [x] Multi-threaded Executor (work-stealing, thread pool)
+  - [x] Thread-safe Context (Arc, Mutex)
+  - [x] Cross-thread Task Spawning
+  - [x] Synchronization Primitives (Mutex, Condvar, etc.)
+  - [ ] Structured Concurrency Primitives (join, select)
 
 - [ ] **Macros & Ergonomics**
   - [ ] `cadentis::main` proc-macro
@@ -65,7 +66,7 @@ use cadentis::net::tcp_listener::TcpListener;
 use cadentis::{RuntimeBuilder, Task};
 
 fn main() {
-  let rt = RuntimeBuilder::new().enable_io().build();
+  let rt = RuntimeBuilder::new().build();
 
   rt.block_on(async move {
     let listener: TcpListener = TcpListener::bind("127.0.0.1")
