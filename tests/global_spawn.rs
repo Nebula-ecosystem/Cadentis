@@ -102,7 +102,7 @@ fn test_global_spawn_from_spawned_task() {
 }
 
 #[test]
-#[should_panic(expected = "task::spawn() called outside of a runtime context")]
+#[should_panic(expected = "spawn called outside of runtime")]
 fn test_global_spawn_panics_outside_runtime() {
     task::spawn(async {
         println!("This should never run");

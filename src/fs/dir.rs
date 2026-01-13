@@ -42,7 +42,12 @@ impl Dir {
                 }
                 Component::Normal(seg) => {
                     acc.push(seg);
-                    Self::make_directory(&acc)?;
+
+                    match Self::make_directory(&acc) {
+                        Ok(_) => {}
+                        Err(e) if e.kind() == io::ErrorKind::AlreadyExists && acc.is_dir() => {}
+                        Err(e) => return Err(e),
+                    }
                 }
                 _ => {
                     return Err(io::Error::new(
@@ -76,12 +81,7 @@ impl Dir {
         let rc = sys_mkdir(c_path.as_ptr(), 0o755);
 
         if rc < 0 {
-            let error = io::Error::last_os_error();
-
-            match error.kind() {
-                io::ErrorKind::AlreadyExists => Ok(()),
-                _ => Err(error),
-            }
+            Err(io::Error::last_os_error())
         } else {
             Ok(())
         }

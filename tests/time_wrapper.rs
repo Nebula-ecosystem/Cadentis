@@ -7,7 +7,8 @@ use std::time::Duration;
 fn test_time_wrapper_with_sleep() {
     let rt = RuntimeBuilder::new().build();
 
-    let (_, elapsed) = rt.block_on(async { instrumented(sleep(Duration::from_millis(50))).await });
+    let (_, elapsed) =
+        rt.block_on(async move { instrumented(sleep(Duration::from_millis(50))).await });
 
     assert!(
         elapsed >= Duration::from_millis(50),
