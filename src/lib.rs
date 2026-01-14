@@ -8,5 +8,6 @@ pub mod time;
 pub mod tools;
 
 pub use runtime::builder::RuntimeBuilder;
+pub use runtime::macros;
 pub use runtime::task;
 pub use runtime::yield_now::yield_now;
