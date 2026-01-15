@@ -1,6 +1,6 @@
+use cadentis::task;
 use cadentis::time::sleep;
 use cadentis::time::timeout;
-use cadentis::task;
 use std::time::Duration;
 
 #[cadentis::test]

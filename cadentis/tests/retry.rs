@@ -1,5 +1,5 @@
-use cadentis::tools::retry;
 use cadentis::task;
+use cadentis::tools::retry;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
