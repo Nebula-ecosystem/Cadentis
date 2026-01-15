@@ -67,27 +67,24 @@ Accept and handle an incoming TCP connection using Cadentis async I/O and task s
 
 ```rust
 use cadentis::net::tcp_listener::TcpListener;
-use cadentis::{RuntimeBuilder, Task};
+use cadentis::spawn;
 
-fn main() {
-  let rt = RuntimeBuilder::new().build();
+#[cadentis::main]
+async fn main() {
+  let listener: TcpListener = TcpListener::bind("127.0.0.1")
+    .await
+    .expect("Failed to bind listener");
 
-  rt.block_on(async move {
-    let listener: TcpListener = TcpListener::bind("127.0.0.1")
-      .await
-      .expect("Failed to bind listener");
+  let handle: () = spawn(async move {
+    let (stream, _) = listener.accept().await.expect("Failed to accept incoming connection");
 
-    let handle = Task::spawn(async move {
-      let (stream, _) = listener.accept().await.expect("Failed to accept incoming connection");
+    let mut buf: [u8; 4] = [0u8; 4];
+    let n: usize = stream.read(&mut buf).await.expect("Failed to read");
 
-      let mut buf: [u8; 4] = [0u8; 4];
-      let n: usize = stream.read(&mut buf).await.expect("Failed to read");
-
-      if &buf[..n] == b"ping" {
-          stream.write_all(b"pong").await.expect("Failed to write");
-      }
-    }).await;
-  })
+    if &buf[..n] == b"ping" {
+        stream.write_all(b"pong").await.expect("Failed to write");
+    }
+  }).await;
 }
 ```
 
