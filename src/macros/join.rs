@@ -3,15 +3,13 @@ macro_rules! join {
     ( $future:expr $(,)? ) => {{ $future.await }};
 
     ( $f1:expr, $f2:expr $(,)? ) => {{
-        use std::future;
-        use std::future::Future;
-        use std::pin::Pin;
-        use std::task::{Context, Poll};
+        use std::future::poll_fn;
+        use std::task::Poll;
 
         let mut __f1 = (Box::pin($f1), None, false);
         let mut __f2 = (Box::pin($f2), None, false);
 
-        future::poll_fn(move |cx: &mut Context<'_>| {
+        poll_fn(move |cx| {
             if !__f1.2 {
                 if let Poll::Ready(val) = __f1.0.as_mut().poll(cx) {
                     __f1.1 = Some(val);
@@ -34,16 +32,14 @@ macro_rules! join {
     }};
 
     ( $f1:expr, $f2:expr, $f3:expr $(,)? ) => {{
-        use std::future;
-        use std::future::Future;
-        use std::pin::Pin;
-        use std::task::{Context, Poll};
+        use std::future::poll_fn;
+        use std::task::Poll;
 
         let mut __f1 = (Box::pin($f1), None, false);
         let mut __f2 = (Box::pin($f2), None, false);
         let mut __f3 = (Box::pin($f3), None, false);
 
-        future::poll_fn(move |cx: &mut Context<'_>| {
+        poll_fn(move |cx| {
             if !__f1.2 {
                 if let Poll::Ready(val) = __f1.0.as_mut().poll(cx) {
                     __f1.1 = Some(val);
@@ -76,17 +72,15 @@ macro_rules! join {
     }};
 
     ( $f1:expr, $f2:expr, $f3:expr, $f4:expr $(,)? ) => {{
-        use std::future;
-        use std::future::Future;
-        use std::pin::Pin;
-        use std::task::{Context, Poll};
+        use std::future::poll_fn;
+        use std::task::Poll;
 
         let mut __f1 = (Box::pin($f1), None, false);
         let mut __f2 = (Box::pin($f2), None, false);
         let mut __f3 = (Box::pin($f3), None, false);
         let mut __f4 = (Box::pin($f4), None, false);
 
-        future::poll_fn(move |cx: &mut Context<'_>| {
+        poll_fn(move |cx| {
             if !__f1.2 {
                 if let Poll::Ready(val) = __f1.0.as_mut().poll(cx) {
                     __f1.1 = Some(val);

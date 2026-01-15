@@ -32,15 +32,17 @@
   - [x] Time Measurement (benchmark async ops)
   - [x] Retry Utility (repeated attempts)
 
-- [ ] **Multithreading**
+- [x] **Multithreading**
   - [x] Multi-threaded Executor (work-stealing, thread pool)
   - [x] Thread-safe Context (Arc, Mutex)
   - [x] Cross-thread Task Spawning
   - [x] Synchronization Primitives (Mutex, Condvar, etc.)
-  - [ ] Structured Concurrency Primitives (join, select)
+  - [x] Structured Concurrency Primitives (join, select)
 
 - [ ] **Macros & Ergonomics**
   - [ ] `cadentis::main` proc-macro
+  - [ ] `cadentis::test` proc-macro
+  - [ ] `join!` / `select!` macros (extensible / variadic for arbitrary number of futures)
 
 - [ ] **Extensibility**
   - [ ] Windows/Linux Support (epoll, IOCP)
