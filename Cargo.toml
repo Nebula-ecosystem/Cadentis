@@ -1,7 +1,8 @@
-[package]
-name = "cadentis"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = [
+    "Cadentis",
+    "Cadentis-macros"
+]
 
-[dependencies]
-libc = "0.2.180"
+[workspace.dependencies]
+cadentis-macros = { path = "Cadentis-macros" }
