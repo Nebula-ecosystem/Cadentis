@@ -142,8 +142,8 @@ fn test_select_option_pattern() {
 
     let result = rt.block_on(async {
         select! {
-            async { Some(42) } => |opt| opt.unwrap_or(0),
-            async { None::<i32> } => |opt| opt.unwrap_or(-1),
+            async { Some(42) } => |opt: Option<i32>| opt.unwrap_or(0),
+            async { None::<i32> } => |opt: Option<i32>| opt.unwrap_or(-1),
         }
     });
 

@@ -42,10 +42,11 @@
 - [ ] **Macros & Ergonomics**
   - [ ] `cadentis::main` proc-macro
   - [ ] `cadentis::test` proc-macro
-  - [ ] `join!` / `select!` macros (extensible / variadic for arbitrary number of futures)
+  - [x] `join!` / `select!` macros (extensible / variadic for arbitrary number of futures)
 
 - [ ] **Extensibility**
-  - [ ] Windows/Linux Support (epoll, IOCP)
+  - [ ] Windows Support (IOCP)
+  - [ ] Linux Support (epoll)
 --
 
 ## 🚀 Getting Started
@@ -54,7 +55,7 @@ This crate is not yet published on crates.io. Add it directly from GitHub:
 
 ``` toml
 [dependencies]
-cadentis = { git = "https://github.com/Nebula-ecosystem/Cadentis" }
+cadentis = { git = "https://github.com/Nebula-ecosystem/Cadentis", package = "cadentis" }
 ```
 
 ---
