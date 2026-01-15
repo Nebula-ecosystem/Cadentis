@@ -10,9 +10,9 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(worker_threads: usize) -> Self {
         let reactor_handle = Reactor::start();
-        let executor = Executor::new(reactor_handle.clone(), 2); // To change
+        let executor = Executor::new(reactor_handle.clone(), worker_threads);
 
         Self {
             executor,

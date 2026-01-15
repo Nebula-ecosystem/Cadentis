@@ -6,7 +6,6 @@ pub(crate) struct Interest {
     pub(crate) write: bool,
 }
 
-#[derive(Clone)]
 pub(crate) struct Waker(pub(crate) RawFd);
 
 unsafe impl Send for Waker {}

@@ -26,7 +26,6 @@ fn test_select_two_futures_first_ready() {
         }
     });
 
-    // Le premier future prêt gagne (normalement le premier dans l'ordre)
     assert!(result == 10 || result == 20);
 }
 
@@ -119,7 +118,6 @@ fn test_select_counter_incremented_once() {
         }
     });
 
-    // Un seul des deux devrait avoir été exécuté complètement
     let val = counter.load(Ordering::SeqCst);
     assert!(val == 1 || val == 10 || val == 11);
 }
