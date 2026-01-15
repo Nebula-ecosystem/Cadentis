@@ -39,14 +39,15 @@
   - [x] Synchronization Primitives (Mutex, Condvar, etc.)
   - [x] Structured Concurrency Primitives (join, select)
 
-- [ ] **Macros & Ergonomics**
-  - [ ] `cadentis::main` proc-macro
-  - [ ] `cadentis::test` proc-macro
+- [x] **Macros & Ergonomics**
+  - [x] `cadentis::main` proc-macro
+  - [x] `cadentis::test` proc-macro
   - [x] `join!` / `select!` macros (extensible / variadic for arbitrary number of futures)
 
 - [ ] **Extensibility**
   - [ ] Windows Support (IOCP)
   - [ ] Linux Support (epoll)
+
 --
 
 ## 🚀 Getting Started

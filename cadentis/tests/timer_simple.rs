@@ -1,15 +1,10 @@
-use cadentis::RuntimeBuilder;
 use cadentis::time::sleep;
 use std::time::{Duration, Instant};
 
-#[test]
-fn test_sleep_basic() {
-    let rt = RuntimeBuilder::new().build();
-
+#[cadentis::test]
+async fn test_sleep_basic() {
     let start = Instant::now();
-    rt.block_on(async {
-        sleep(Duration::from_millis(50)).await;
-    });
+    sleep(Duration::from_millis(50)).await;
     let elapsed = start.elapsed();
 
     assert!(
@@ -18,14 +13,10 @@ fn test_sleep_basic() {
     );
 }
 
-#[test]
-fn test_sleep_zero_duration() {
-    let rt = RuntimeBuilder::new().build();
-
+#[cadentis::test]
+async fn test_sleep_zero_duration() {
     let start = Instant::now();
-    rt.block_on(async {
-        sleep(Duration::from_millis(0)).await;
-    });
+    sleep(Duration::from_millis(0)).await;
     let elapsed = start.elapsed();
 
     assert!(
@@ -34,14 +25,10 @@ fn test_sleep_zero_duration() {
     );
 }
 
-#[test]
-fn test_sleep_in_function() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_sleep_in_function() {
     let start = Instant::now();
-
-    rt.block_on(async move {
-        sleep_and_record(start).await;
-    });
+    sleep_and_record(start).await;
 }
 
 async fn sleep_and_record(start: Instant) {

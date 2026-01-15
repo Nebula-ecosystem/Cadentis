@@ -1,30 +1,25 @@
 use cadentis::tools::retry;
-use cadentis::{RuntimeBuilder, task};
+use cadentis::task;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[test]
-fn test_retry_succeeds_before_limit() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_retry_succeeds_before_limit() {
     let attempts = Arc::new(AtomicUsize::new(0));
 
-    let result = rt.block_on({
-        let attempts = attempts.clone();
-        async move {
-            retry(5, move || {
-                let attempts = attempts.clone();
-                task::spawn(async move {
-                    let n = attempts.fetch_add(1, Ordering::SeqCst);
-                    if n < 2 {
-                        Err::<i32, &'static str>("fail")
-                    } else {
-                        Ok(42)
-                    }
-                })
-            })
-            .await
-        }
-    });
+    let attempts_clone = attempts.clone();
+    let result = retry(5, move || {
+        let attempts = attempts_clone.clone();
+        task::spawn(async move {
+            let n = attempts.fetch_add(1, Ordering::SeqCst);
+            if n < 2 {
+                Err::<i32, &'static str>("fail")
+            } else {
+                Ok(42)
+            }
+        })
+    })
+    .await;
 
     assert!(
         matches!(result, Ok(42)),
@@ -37,24 +32,19 @@ fn test_retry_succeeds_before_limit() {
     );
 }
 
-#[test]
-fn test_retry_fails_after_limit() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_retry_fails_after_limit() {
     let attempts = Arc::new(AtomicUsize::new(0));
 
-    let result = rt.block_on({
-        let attempts = attempts.clone();
-        async move {
-            retry(3, move || {
-                let attempts = attempts.clone();
-                task::spawn(async move {
-                    attempts.fetch_add(1, Ordering::SeqCst);
-                    Err::<usize, &'static str>("fail")
-                })
-            })
-            .await
-        }
-    });
+    let attempts_clone = attempts.clone();
+    let result = retry(3, move || {
+        let attempts = attempts_clone.clone();
+        task::spawn(async move {
+            attempts.fetch_add(1, Ordering::SeqCst);
+            Err::<usize, &'static str>("fail")
+        })
+    })
+    .await;
 
     assert!(result.is_err(), "Retry should fail after limit");
     assert_eq!(
@@ -64,50 +54,47 @@ fn test_retry_fails_after_limit() {
     );
 }
 
-#[test]
-fn test_retry_with_interval() {
+#[cadentis::test]
+async fn test_retry_with_interval() {
     use cadentis::time::sleep;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Mutex;
     use std::time::{Duration, Instant};
 
-    let rt = RuntimeBuilder::new().build();
     let attempts = Arc::new(AtomicUsize::new(0));
     let attempts_clone = attempts.clone();
     let last_time = Arc::new(Mutex::new(None));
     let last_time_clone = last_time.clone();
     let interval = Duration::from_millis(20);
 
-    let result = rt.block_on(async move {
-        retry(3, move || {
-            let attempts_clone = attempts_clone.clone();
-            let last_time_clone = last_time_clone.clone();
-            task::spawn(async move {
-                let now = Instant::now();
-                let n = attempts_clone.fetch_add(1, Ordering::SeqCst);
-                if n > 0 {
-                    let mut last = last_time_clone.lock().unwrap();
-                    if let Some(prev) = *last {
-                        let elapsed = now.duration_since(prev);
-                        assert!(
-                            elapsed >= interval,
-                            "Intervalle entre les tentatives trop court: {:?}",
-                            elapsed
-                        );
-                    }
-                    *last = Some(now);
-                } else {
-                    *last_time_clone.lock().unwrap() = Some(now);
+    let result = retry(3, move || {
+        let attempts_clone = attempts_clone.clone();
+        let last_time_clone = last_time_clone.clone();
+        task::spawn(async move {
+            let now = Instant::now();
+            let n = attempts_clone.fetch_add(1, Ordering::SeqCst);
+            if n > 0 {
+                let mut last = last_time_clone.lock().unwrap();
+                if let Some(prev) = *last {
+                    let elapsed = now.duration_since(prev);
+                    assert!(
+                        elapsed >= interval,
+                        "Intervalle entre les tentatives trop court: {:?}",
+                        elapsed
+                    );
                 }
-                if n < 2 {
-                    sleep(interval).await;
-                    Err("fail")
-                } else {
-                    Ok(77)
-                }
-            })
+                *last = Some(now);
+            } else {
+                *last_time_clone.lock().unwrap() = Some(now);
+            }
+            if n < 2 {
+                sleep(interval).await;
+                Err("fail")
+            } else {
+                Ok(77)
+            }
         })
-        .await
-    });
+    })
+    .await;
 
     assert!(
         matches!(result, Ok(77)),
@@ -120,37 +107,32 @@ fn test_retry_with_interval() {
     );
 }
 
-#[test]
-fn test_timeout_with_retry() {
+#[cadentis::test]
+async fn test_timeout_with_retry() {
     use cadentis::time::{sleep, timeout};
     use std::time::Duration;
 
-    let rt = RuntimeBuilder::new().build();
     let attempts = Arc::new(AtomicUsize::new(0));
 
-    let result = rt.block_on({
-        let attempts = attempts.clone();
-        async move {
-            retry(5, move || {
-                let attempts = attempts.clone();
-                task::spawn(async move {
-                    let n = attempts.fetch_add(1, Ordering::SeqCst);
+    let attempts_clone = attempts.clone();
+    let result = retry(5, move || {
+        let attempts = attempts_clone.clone();
+        task::spawn(async move {
+            let n = attempts.fetch_add(1, Ordering::SeqCst);
 
-                    timeout(Duration::from_millis(10), async move {
-                        if n < 3 {
-                            sleep(Duration::from_millis(20)).await;
-                            Ok::<_, &'static str>(0)
-                        } else {
-                            Ok::<_, &'static str>(123)
-                        }
-                    })
-                    .await
-                    .map_err(|_| "timeout")
-                })
+            timeout(Duration::from_millis(10), async move {
+                if n < 3 {
+                    sleep(Duration::from_millis(20)).await;
+                    Ok::<_, &'static str>(0)
+                } else {
+                    Ok::<_, &'static str>(123)
+                }
             })
             .await
-        }
-    });
+            .map_err(|_| "timeout")
+        })
+    })
+    .await;
 
     assert!(
         matches!(result, Ok(Ok(123))),

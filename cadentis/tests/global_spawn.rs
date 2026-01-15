@@ -1,18 +1,15 @@
-use cadentis::{RuntimeBuilder, task};
+use cadentis::task;
 use std::sync::{Arc, Mutex};
 
-#[test]
-fn test_global_spawn_basic() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_global_spawn_basic() {
     let completed = Arc::new(Mutex::new(false));
     let completed_clone = completed.clone();
 
-    rt.block_on(async move {
-        let handle = task::spawn(async move {
-            *completed_clone.lock().unwrap() = true;
-        });
-        handle.await;
+    let handle = task::spawn(async move {
+        *completed_clone.lock().unwrap() = true;
     });
+    handle.await;
 
     assert!(
         *completed.lock().unwrap(),
@@ -20,32 +17,29 @@ fn test_global_spawn_basic() {
     );
 }
 
-#[test]
-fn test_global_spawn_multiple() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_global_spawn_multiple() {
     let counter = Arc::new(Mutex::new(0));
 
     let c1 = counter.clone();
     let c2 = counter.clone();
     let c3 = counter.clone();
 
-    rt.block_on(async move {
-        let h1 = task::spawn(async move {
-            *c1.lock().unwrap() += 1;
-        });
-
-        let h2 = task::spawn(async move {
-            *c2.lock().unwrap() += 10;
-        });
-
-        let h3 = task::spawn(async move {
-            *c3.lock().unwrap() += 100;
-        });
-
-        h1.await;
-        h2.await;
-        h3.await;
+    let h1 = task::spawn(async move {
+        *c1.lock().unwrap() += 1;
     });
+
+    let h2 = task::spawn(async move {
+        *c2.lock().unwrap() += 10;
+    });
+
+    let h3 = task::spawn(async move {
+        *c3.lock().unwrap() += 100;
+    });
+
+    h1.await;
+    h2.await;
+    h3.await;
 
     assert_eq!(
         *counter.lock().unwrap(),
@@ -54,9 +48,8 @@ fn test_global_spawn_multiple() {
     );
 }
 
-#[test]
-fn test_global_spawn_nested() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_global_spawn_nested() {
     let values = Arc::new(Mutex::new(Vec::new()));
 
     let v0 = values.clone();
@@ -64,50 +57,45 @@ fn test_global_spawn_nested() {
     let v2 = values.clone();
     let v3 = values.clone();
 
-    rt.block_on(async move {
-        v0.lock().unwrap().push(1);
+    v0.lock().unwrap().push(1);
 
-        let h1 = task::spawn(async move {
-            v1.lock().unwrap().push(2);
+    let h1 = task::spawn(async move {
+        v1.lock().unwrap().push(2);
 
-            let h_inner = task::spawn(async move {
-                v2.lock().unwrap().push(3);
-            });
-            h_inner.await;
+        let h_inner = task::spawn(async move {
+            v2.lock().unwrap().push(3);
         });
-
-        let h2 = task::spawn(async move {
-            v3.lock().unwrap().push(4);
-        });
-
-        h1.await;
-        h2.await;
+        h_inner.await;
     });
+
+    let h2 = task::spawn(async move {
+        v3.lock().unwrap().push(4);
+    });
+
+    h1.await;
+    h2.await;
 
     let mut vals = values.lock().unwrap().clone();
     vals.sort();
     assert_eq!(vals, vec![1, 2, 3, 4], "All nested spawns should execute");
 }
 
-#[test]
-fn test_global_spawn_from_spawned_task() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_global_spawn_from_spawned_task() {
     let counter = Arc::new(Mutex::new(0));
 
     let c1 = counter.clone();
     let c2 = counter.clone();
 
-    rt.block_on(async move {
-        let h = task::spawn(async move {
-            *c1.lock().unwrap() += 1;
+    let h = task::spawn(async move {
+        *c1.lock().unwrap() += 1;
 
-            let h_inner = task::spawn(async move {
-                *c2.lock().unwrap() += 10;
-            });
-            h_inner.await;
+        let h_inner = task::spawn(async move {
+            *c2.lock().unwrap() += 10;
         });
-        h.await;
+        h_inner.await;
     });
+    h.await;
 
     assert_eq!(*counter.lock().unwrap(), 11, "Nested spawn should work");
 }
@@ -120,28 +108,25 @@ fn test_global_spawn_panics_outside_runtime() {
     });
 }
 
-#[test]
-fn test_global_spawn_with_return_values() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_global_spawn_with_return_values() {
     let results = Arc::new(Mutex::new(Vec::new()));
 
     let r1 = results.clone();
     let r2 = results.clone();
 
-    rt.block_on(async move {
-        let h1 = task::spawn(async move {
-            let value = compute_value(5);
-            r1.lock().unwrap().push(value);
-        });
-
-        let h2 = task::spawn(async move {
-            let value = compute_value(10);
-            r2.lock().unwrap().push(value);
-        });
-
-        h1.await;
-        h2.await;
+    let h1 = task::spawn(async move {
+        let value = compute_value(5);
+        r1.lock().unwrap().push(value);
     });
+
+    let h2 = task::spawn(async move {
+        let value = compute_value(10);
+        r2.lock().unwrap().push(value);
+    });
+
+    h1.await;
+    h2.await;
 
     let mut res = results.lock().unwrap().clone();
     res.sort();
@@ -152,15 +137,12 @@ fn compute_value(x: i32) -> i32 {
     x * x
 }
 
-#[test]
-fn test_spawn_from_separate_async_function() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_spawn_from_separate_async_function() {
     let counter = Arc::new(Mutex::new(0));
 
     let c = counter.clone();
-    rt.block_on(async move {
-        do_work_with_spawn(c).await;
-    });
+    do_work_with_spawn(c).await;
 
     assert_eq!(
         *counter.lock().unwrap(),
@@ -185,16 +167,13 @@ async fn do_work_with_spawn(counter: Arc<Mutex<i32>>) {
     h2.await;
 }
 
-#[test]
-fn test_spawn_from_nested_function_calls() {
-    let rt = RuntimeBuilder::new().build();
+#[cadentis::test]
+async fn test_spawn_from_nested_function_calls() {
     let values = Arc::new(Mutex::new(Vec::new()));
 
     let v = values.clone();
-    rt.block_on(async move {
-        v.lock().unwrap().push(1);
-        nested_function_a(v).await;
-    });
+    v.lock().unwrap().push(1);
+    nested_function_a(v).await;
 
     let mut vals = values.lock().unwrap().clone();
     vals.sort();

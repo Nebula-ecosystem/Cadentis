@@ -1,6 +1,6 @@
 mod utils;
 
-use proc_macro::TokenStream;
+use proc_macro::{TokenStream, TokenTree};
 
 #[proc_macro]
 pub fn join(input: TokenStream) -> TokenStream {
@@ -133,4 +133,104 @@ pub fn select(input: TokenStream) -> TokenStream {
         let msg = format!("select macro error: {err}");
         format!("compile_error!(\"{}\");", msg).parse().unwrap()
     })
+}
+
+#[proc_macro_attribute]
+pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut tokens: Vec<TokenTree> = item.into_iter().collect();
+
+    let attr_str = attr.to_string();
+    let mut worker_threads: Option<usize> = None;
+
+    if !attr_str.is_empty() {
+        for part in attr_str.split(',') {
+            let part = part.trim();
+            if let Some(v) = part.strip_prefix("worker_threads") {
+                let v = v.trim_start_matches('=').trim();
+                worker_threads = v.parse::<usize>().ok();
+            }
+        }
+    }
+
+    let Some(pos) = tokens.iter().rposition(
+        |t| matches!(t, TokenTree::Group(g) if g.delimiter() == proc_macro::Delimiter::Brace),
+    ) else {
+        return TokenStream::new();
+    };
+
+    let block = match &tokens[pos] {
+        TokenTree::Group(g) => g.stream().to_string(),
+        _ => unreachable!(),
+    };
+
+    let mut builder = String::from("::cadentis::RuntimeBuilder::new()");
+
+    if let Some(n) = worker_threads {
+        builder.push_str(&format!(".worker_threads({})", n));
+    }
+
+    builder.push_str(".build()");
+
+    let new_block = format!(
+        "{{
+            let runtime = {};
+            runtime
+                .block_on(async move {{
+                    {}
+                }})
+        }}",
+        builder, block
+    );
+
+    tokens[pos] = TokenTree::Group(proc_macro::Group::new(
+        proc_macro::Delimiter::Brace,
+        new_block.parse().unwrap(),
+    ));
+
+    tokens.into_iter().collect()
+}
+
+#[proc_macro_attribute]
+pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut tokens = item.into_iter().collect::<Vec<_>>();
+
+    if let Some(pos) = tokens
+        .iter()
+        .position(|t| matches!(t, TokenTree::Ident(id) if id.to_string() == "async"))
+    {
+        tokens.remove(pos);
+    }
+
+    let block_pos = tokens.iter().rposition(
+        |t| matches!(t, TokenTree::Group(g) if g.delimiter() == proc_macro::Delimiter::Brace),
+    );
+
+    let Some(pos) = block_pos else {
+        return TokenStream::new();
+    };
+
+    let block = match &tokens[pos] {
+        TokenTree::Group(g) => g.stream().to_string(),
+        _ => unreachable!(),
+    };
+
+    let new_block = format!(
+        "{{
+        let runtime = ::cadentis::RuntimeBuilder::new().build();
+        runtime
+            .block_on(async move {{ {} }});
+    }}",
+        block
+    );
+
+    tokens[pos] = TokenTree::Group(proc_macro::Group::new(
+        proc_macro::Delimiter::Brace,
+        new_block.parse().unwrap(),
+    ));
+
+    let test_attr: TokenStream = "#[test]".parse().unwrap();
+    let mut result: Vec<TokenTree> = test_attr.into_iter().collect();
+    result.extend(tokens);
+
+    result.into_iter().collect()
 }

@@ -20,18 +20,13 @@ fn unique_temp_base() -> PathBuf {
     base.join(format!("reactor_folder_test_{}_{}_{}", pid, nanos, seq))
 }
 
-#[test]
+#[cadentis::test]
 fn folder_create_single() {
-    let rt = cadentis::RuntimeBuilder::new().build();
-
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
 
-    let base_for_async = base_str.clone();
-    rt.block_on(async move {
-        let dir = Dir::create(&base_for_async).await.expect("create single");
-        assert_eq!(dir.path(), base);
-    });
+    let dir = Dir::create(&base_str).await.expect("create single");
+    assert_eq!(dir.path(), base);
 
     let meta = fs::metadata(&base_str).expect("metadata");
     assert!(meta.is_dir());
@@ -39,26 +34,19 @@ fn folder_create_single() {
     fs::remove_dir(&base_str).expect("cleanup");
 }
 
-#[test]
+#[cadentis::test]
 fn folder_create_all_nested_and_idempotent() {
-    let rt = cadentis::RuntimeBuilder::new().build();
-
     let base = unique_temp_base();
     let nested = base.join("a").join("b").join("c");
     let base_str = base.to_string_lossy().into_owned();
     let nested_str = nested.to_string_lossy().into_owned();
 
-    let nested_for_async = nested_str.clone();
-    rt.block_on(async move {
-        let dir = Dir::create_all(&nested_for_async)
-            .await
-            .expect("create_all");
-        assert_eq!(dir.path(), nested);
+    let dir = Dir::create_all(&nested_str).await.expect("create_all");
+    assert_eq!(dir.path(), nested);
 
-        Dir::create_all(&nested_for_async)
-            .await
-            .expect("create_all idempotent");
-    });
+    Dir::create_all(&nested_str)
+        .await
+        .expect("create_all idempotent");
 
     let meta = fs::metadata(&nested_str).expect("metadata nested");
     assert!(meta.is_dir());
@@ -66,41 +54,26 @@ fn folder_create_all_nested_and_idempotent() {
     fs::remove_dir_all(&base_str).expect("cleanup nested");
 }
 
-#[test]
+#[cadentis::test]
 fn folder_create_fails_when_exists() {
-    let rt = cadentis::RuntimeBuilder::new().build();
-
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
 
-    let base_for_async = base_str.clone();
-    rt.block_on(async move {
-        Dir::create(&base_for_async).await.expect("first create");
+    Dir::create(&base_str).await.expect("first create");
 
-        let err = Dir::create(&base_for_async)
-            .await
-            .err()
-            .expect("expected error");
-        assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
-    });
+    let err = Dir::create(&base_str).await.err().expect("expected error");
+    assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
 
     fs::remove_dir(&base_str).expect("cleanup");
 }
 
-#[test]
+#[cadentis::test]
 fn folder_exists_api() {
-    let rt = cadentis::RuntimeBuilder::new().build();
-
     let base = unique_temp_base();
     let base_str = base.to_string_lossy().into_owned();
 
-    let base_for_async = base_str.clone();
-    let dir: Dir = rt.block_on(async move {
-        let f = Dir::create(&base_for_async).await.expect("create");
-        assert!(f.exists());
-
-        f
-    });
+    let dir = Dir::create(&base_str).await.expect("create");
+    assert!(dir.exists());
 
     fs::remove_dir(&base_str).expect("cleanup");
 
