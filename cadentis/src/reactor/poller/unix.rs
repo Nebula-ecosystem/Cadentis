@@ -11,29 +11,44 @@ use std::os::fd::RawFd;
 use std::str::FromStr;
 use std::{io, mem};
 
+/// Default flags used when opening a file for reading.
 pub(crate) const OPENFLAGS: i32 = O_RDONLY | O_NONBLOCK;
+
+/// Default flags used when creating a file for writing.
 pub(crate) const CREATEFLAGS: i32 = O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK;
 
+/// Reads from a file descriptor into the given buffer.
+///
+/// Returns the number of bytes read, or a negative value on error.
+/// The file descriptor **must** be non-blocking.
 pub(crate) fn sys_read(fd: RawFd, buffer: &mut [u8]) -> isize {
     unsafe { read(fd, buffer.as_mut_ptr() as *mut _, buffer.len()) }
 }
 
+/// Writes the buffer to a file descriptor.
+///
+/// Returns the number of bytes written, or a negative value on error.
+/// The file descriptor **must** be non-blocking.
 pub(crate) fn sys_write(fd: RawFd, buffer: &[u8]) -> isize {
     unsafe { write(fd, buffer.as_ptr() as *const _, buffer.len()) }
 }
 
+/// Closes a file descriptor.
 pub(crate) fn sys_close(fd: RawFd) {
     unsafe { close(fd) };
 }
 
+/// Opens a file using `open(2)`.
 pub(crate) fn sys_open(path: *const c_char, flags: i32, mode: mode_t) -> RawFd {
     unsafe { open(path, flags, mode as c_uint) }
 }
 
+/// Creates a directory using `mkdir(2)`.
 pub(crate) fn sys_mkdir(path: *const c_char, mode: mode_t) -> RawFd {
     unsafe { mkdir(path, mode) }
 }
 
+/// Sets a file descriptor to non-blocking mode.
 pub(crate) fn sys_set_nonblocking(fd: RawFd) -> io::Result<()> {
     let flags = unsafe { fcntl(fd, F_GETFL) };
     if flags < 0 {
@@ -48,6 +63,7 @@ pub(crate) fn sys_set_nonblocking(fd: RawFd) -> io::Result<()> {
     Ok(())
 }
 
+/// Creates a non-blocking stream socket.
 pub(crate) fn sys_socket(domain: c_int) -> io::Result<RawFd> {
     let fd = unsafe { socket(domain, SOCK_STREAM, 0) };
     if fd < 0 {
@@ -62,6 +78,7 @@ pub(crate) fn sys_socket(domain: c_int) -> io::Result<RawFd> {
     Ok(fd)
 }
 
+/// Binds a socket to an address.
 pub(crate) fn sys_bind(fd: RawFd, addr: &sockaddr_storage, len: socklen_t) -> io::Result<()> {
     let rc = unsafe { bind(fd, addr as *const _ as *const sockaddr, len) };
     if rc < 0 {
@@ -71,6 +88,7 @@ pub(crate) fn sys_bind(fd: RawFd, addr: &sockaddr_storage, len: socklen_t) -> io
     }
 }
 
+/// Marks a socket as a listening socket.
 pub(crate) fn sys_listen(fd: RawFd) -> io::Result<()> {
     let rc = unsafe { listen(fd, 128) };
     if rc < 0 {
@@ -80,6 +98,9 @@ pub(crate) fn sys_listen(fd: RawFd) -> io::Result<()> {
     }
 }
 
+/// Accepts a new incoming connection.
+///
+/// The returned client socket is automatically set to non-blocking mode.
 pub(crate) fn sys_accept(fd: RawFd) -> io::Result<(RawFd, SocketAddr)> {
     let mut storage: sockaddr_storage = unsafe { mem::zeroed() };
     let mut len = mem::size_of::<sockaddr_storage>() as socklen_t;
@@ -100,6 +121,7 @@ pub(crate) fn sys_accept(fd: RawFd) -> io::Result<(RawFd, SocketAddr)> {
     Ok((client_fd, addr))
 }
 
+/// Returns the local address of a socket.
 pub(crate) fn sys_sockname(fd: RawFd) -> io::Result<SocketAddr> {
     let mut storage: sockaddr_storage = unsafe { mem::zeroed() };
     let mut len = mem::size_of::<sockaddr_storage>() as socklen_t;
@@ -113,6 +135,7 @@ pub(crate) fn sys_sockname(fd: RawFd) -> io::Result<SocketAddr> {
     }
 }
 
+/// Initiates a non-blocking connection.
 pub(crate) fn sys_connect(fd: RawFd, addr: &SocketAddr) -> io::Result<()> {
     let (storage, len) = socketaddr_to_storage(addr);
 
@@ -124,6 +147,7 @@ pub(crate) fn sys_connect(fd: RawFd, addr: &SocketAddr) -> io::Result<()> {
     }
 }
 
+/// Shuts down a socket.
 pub(crate) fn sys_shutdown(fd: RawFd, how: Shutdown) -> io::Result<()> {
     let how = match how {
         Shutdown::Read => SHUT_RD,
@@ -139,6 +163,7 @@ pub(crate) fn sys_shutdown(fd: RawFd, how: Shutdown) -> io::Result<()> {
     }
 }
 
+/// Enables `SO_REUSEADDR` on a socket.
 pub(crate) fn sys_set_reuseaddr(fd: RawFd) -> io::Result<()> {
     let yes: c_int = 1;
     let rc = unsafe {
@@ -158,6 +183,7 @@ pub(crate) fn sys_set_reuseaddr(fd: RawFd) -> io::Result<()> {
     }
 }
 
+/// Parses a socket address string into a `sockaddr_storage`.
 pub(crate) fn sys_parse_sockaddr(address: &str) -> io::Result<(sockaddr_storage, socklen_t)> {
     let addr = SocketAddr::from_str(address)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid socket addr"))?;
@@ -165,6 +191,7 @@ pub(crate) fn sys_parse_sockaddr(address: &str) -> io::Result<(sockaddr_storage,
     Ok(socketaddr_to_storage(&addr))
 }
 
+/// Converts a `sockaddr_storage` to a Rust `SocketAddr`.
 pub(crate) fn sockaddr_storage_to_socketaddr(storage: &sockaddr_storage) -> io::Result<SocketAddr> {
     match storage.ss_family as c_int {
         AF_INET => {
@@ -195,6 +222,7 @@ pub(crate) fn sockaddr_storage_to_socketaddr(storage: &sockaddr_storage) -> io::
     }
 }
 
+/// Converts a `SocketAddr` to a `sockaddr_storage`.
 pub(crate) fn socketaddr_to_storage(addr: &SocketAddr) -> (sockaddr_storage, socklen_t) {
     let mut storage: sockaddr_storage = unsafe { mem::zeroed() };
 
@@ -221,6 +249,7 @@ pub(crate) fn socketaddr_to_storage(addr: &SocketAddr) -> (sockaddr_storage, soc
     }
 }
 
+/// Enables IPv6 dual-stack support when required.
 pub(crate) fn sys_ipv6_is_necessary(fd: RawFd, domain: c_int) -> io::Result<()> {
     if domain == AF_INET6 {
         sys_set_v6only(fd, false)?;
@@ -228,6 +257,7 @@ pub(crate) fn sys_ipv6_is_necessary(fd: RawFd, domain: c_int) -> io::Result<()> 
     Ok(())
 }
 
+/// Sets the `IPV6_V6ONLY` socket option.
 pub(crate) fn sys_set_v6only(fd: RawFd, v6only: bool) -> io::Result<()> {
     let value: c_int = if v6only { 1 } else { 0 };
 

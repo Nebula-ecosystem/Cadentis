@@ -11,15 +11,32 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{io, ptr};
 
+/// kqueue-based poller implementation (macOS / BSD).
+///
+/// This poller integrates with the reactor to provide:
+/// - readiness notifications for file descriptors,
+/// - a user-triggered wake-up mechanism,
+/// - timer-aware polling via timeouts.
+///
+/// It is selected at compile time on macOS targets.
 pub(crate) struct KqueuePoller {
+    /// The kqueue file descriptor.
     kqueue: RawFd,
+
+    /// Internal buffer used to receive kevents.
     events: Vec<kevent>,
+
+    /// Waker used to interrupt `kevent()` from another thread.
     waker: Arc<Waker>,
 }
 
 unsafe impl Send for KqueuePoller {}
 
 impl Waker {
+    /// Wakes the poller by triggering a user event.
+    ///
+    /// This is used to interrupt a blocking `kevent()` call
+    /// when new commands are sent to the reactor.
     pub(crate) fn wake(&self) {
         let event = kevent {
             ident: WAKE_IDENT,
@@ -36,9 +53,14 @@ impl Waker {
     }
 }
 
+/// Identifier used for the reactor wake-up event.
 const WAKE_IDENT: usize = 1;
 
 impl KqueuePoller {
+    /// Creates a new `KqueuePoller`.
+    ///
+    /// This initializes the kqueue instance and registers a
+    /// persistent `EVFILT_USER` event used for wake-ups.
     pub(crate) fn new() -> Self {
         let kqueue = unsafe { kqueue() };
         assert!(kqueue >= 0, "kqueue() failed");
@@ -65,10 +87,15 @@ impl KqueuePoller {
         }
     }
 
+    /// Returns a clone of the poller waker.
     pub(crate) fn waker(&self) -> Arc<Waker> {
         self.waker.clone()
     }
 
+    /// Registers a file descriptor with the poller.
+    ///
+    /// The provided `token` is later returned in generated events
+    /// and is used by the reactor to identify the I/O entry.
     pub(crate) fn register(&self, fd: RawFd, token: usize, interest: Interest) {
         let mut events = Vec::new();
 
@@ -106,9 +133,11 @@ impl KqueuePoller {
         }
     }
 
+    /// Updates the interests for an already registered file descriptor.
     pub(crate) fn reregister(&self, fd: RawFd, token: usize, interest: Interest) {
         let mut events = Vec::new();
 
+        // Remove previous interests
         events.push(kevent {
             ident: fd as usize,
             filter: EVFILT_READ,
@@ -127,6 +156,7 @@ impl KqueuePoller {
             udata: ptr::null_mut(),
         });
 
+        // Re-add updated interests
         if interest.read {
             events.push(kevent {
                 ident: fd as usize,
@@ -161,6 +191,7 @@ impl KqueuePoller {
         }
     }
 
+    /// Deregisters a file descriptor from the poller.
     pub(crate) fn deregister(&self, fd: RawFd) {
         let events = [
             kevent {
@@ -193,6 +224,10 @@ impl KqueuePoller {
         }
     }
 
+    /// Polls for I/O events.
+    ///
+    /// The provided `timeout` is derived from the reactor timer queue.
+    /// All readiness events are converted into [`Event`] values.
     pub(crate) fn poll(
         &mut self,
         events: &mut Vec<Event>,
@@ -243,6 +278,7 @@ impl KqueuePoller {
 
         events.clear();
 
+        // Aggregate read/write readiness per token
         for event in &self.events[..n] {
             if event.filter == EVFILT_USER {
                 continue;

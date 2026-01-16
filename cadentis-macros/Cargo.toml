@@ -3,6 +3,27 @@ name = "cadentis-macros"
 version = "0.1.0"
 edition = "2024"
 
+authors = ["Enzo Blain"]
+license = "SSPL-1.0"
+description = "Procedural macros for the Cadentis async runtime (main, test, join, select)."
+repository = "https://github.com/Nebula-ecosystem/Cadentis"
+homepage = "https://github.com/Nebula-ecosystem/Cadentis"
+documentation = "https://docs.rs/cadentis-macros"
+
+readme = "README.md"
+
+keywords = [
+    "proc-macro",
+    "async",
+    "runtime",
+    "macros",
+]
+
+categories = [
+    "development-tools::procedural-macro-helpers",
+    "asynchronous",
+]
+
 [lib]
 proc-macro = true
 

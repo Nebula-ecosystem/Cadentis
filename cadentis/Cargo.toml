@@ -3,6 +3,29 @@ name = "cadentis"
 version = "0.1.0"
 edition = "2024"
 
+authors = ["Enzo Blain"]
+license = "SSPL-1.0"
+description = "A lightweight async runtime with a work-stealing executor, non-blocking I/O, and minimal API surface."
+repository = "https://github.com/nebula-platform/cadentis"
+homepage = "https://github.com/nebula-platform/cadentis"
+documentation = "https://docs.rs/cadentis"
+
+readme = "README.md"
+
+keywords = [
+    "async",
+    "runtime",
+    "executor",
+    "reactor",
+    "work-stealing",
+]
+
+categories = [
+    "asynchronous",
+    "concurrency",
+    "network-programming",
+]
+
 [dependencies]
 libc = "0.2.180"
 cadentis-macros = { workspace = true }

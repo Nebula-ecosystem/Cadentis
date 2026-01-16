@@ -5,6 +5,26 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+/// Creates a future that retries an asynchronous operation on failure.
+///
+/// The operation is produced by a factory function, which is called again
+/// each time a retry is needed. The retry stops early if the future resolves
+/// successfully.
+///
+/// # Arguments
+///
+/// * `times` - Number of retry attempts after the first failure.
+/// * `factory` - A closure producing a new future on each attempt.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// async fn fallible() -> Result<u32, ()> {
+///     Err(())
+/// }
+///
+/// let retry = retry(3, || fallible());
+/// ```
 pub fn retry<F, G>(times: usize, factory: G) -> Retry<G, F>
 where
     G: FnMut() -> F + Send + 'static,
@@ -13,17 +33,35 @@ where
     Retry::new(times, factory)
 }
 
+/// A future that retries an asynchronous operation until it succeeds
+/// or the retry limit is reached.
+///
+/// Each retry creates a fresh future using the provided factory.
+/// An optional delay can be configured between retries using
+/// [`set_interval`](Self::set_interval).
+///
+/// This type is lazy: no future is created until it is first polled.
 pub struct Retry<G, F> {
+    /// Factory used to create a new future for each attempt.
     factory: G,
+
+    /// Currently running future.
     future: Option<Pin<Box<F>>>,
 
+    /// Optional delay future between retries.
     delay: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
 
+    /// Number of remaining retries.
     remaining: usize,
+
+    /// Delay interval between retries.
     interval: Duration,
 }
 
 impl<G, F> Retry<G, F> {
+    /// Creates a new `Retry` future.
+    ///
+    /// The retry interval is initially zero (no delay).
     fn new(times: usize, factory: G) -> Self {
         Self {
             factory,
@@ -34,6 +72,18 @@ impl<G, F> Retry<G, F> {
         }
     }
 
+    /// Sets a delay between retry attempts.
+    ///
+    /// If the interval is zero, retries occur immediately.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,ignore
+    /// use std::time::Duration;
+    ///
+    /// let retry = retry(5, || async { Err::<(), ()>(()) })
+    ///     .set_interval(Duration::from_millis(100));
+    /// ```
     pub fn set_interval(mut self, interval: Duration) -> Self {
         self.interval = interval;
         self
@@ -47,6 +97,12 @@ where
 {
     type Output = Result<T, E>;
 
+    /// Polls the retry future.
+    ///
+    /// The future:
+    /// - resolves immediately on the first successful attempt,
+    /// - retries on error until the retry count is exhausted,
+    /// - optionally waits for the configured interval between attempts.
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 

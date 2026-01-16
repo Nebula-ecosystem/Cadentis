@@ -10,17 +10,45 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
+/// A runnable unit of work.
+///
+/// Types implementing `Runnable` can be scheduled and executed
+/// by the executor. This abstraction allows the scheduler to
+/// operate on heterogeneous task types.
+///
+/// In practice, `Runnable` is implemented by [`Task`].
 pub(crate) trait Runnable: Send + Sync {
+    /// Executes the runnable task.
     fn run(self: Arc<Self>);
 }
 
+/// A spawned asynchronous task.
+///
+/// A `Task` wraps a future and manages:
+/// - its execution state,
+/// - wake-up logic,
+/// - result storage,
+/// - coordination with the scheduler.
+///
+/// Tasks are reference-counted and can be safely shared across
+/// worker threads.
 pub(crate) struct Task<T> {
+    /// The future being executed.
+    ///
+    /// Stored in an `UnsafeCell` to allow mutable access across
+    /// poll invocations while respecting pinning guarantees.
     future: UnsafeCell<Pin<Box<dyn Future<Output = T> + Send>>>,
 
+    /// Storage for the task result once completed.
     pub(crate) result: UnsafeCell<Option<T>>,
+
+    /// Current execution state of the task.
     pub(crate) state: AtomicUsize,
 
+    /// Handle to the global injector queue.
     injector: Arc<Injector>,
+
+    /// Wakers waiting for the task to complete (used by `JoinHandle`).
     pub(crate) waiters: Mutex<Vec<Waker>>,
 }
 
@@ -28,6 +56,9 @@ unsafe impl<T> Send for Task<T> {}
 unsafe impl<T> Sync for Task<T> {}
 
 impl<T: Send + 'static> Task<T> {
+    /// Creates a new task from a future.
+    ///
+    /// Newly created tasks start in the `QUEUED` state.
     pub(crate) fn new<F>(future: F, injector: Arc<Injector>) -> Self
     where
         F: Future<Output = T> + Send + 'static,
@@ -41,6 +72,13 @@ impl<T: Send + 'static> Task<T> {
         }
     }
 
+    /// Executes the task.
+    ///
+    /// This method:
+    /// - transitions the task into the `RUNNING` state,
+    /// - polls the future,
+    /// - handles state transitions based on the poll result,
+    /// - wakes join handles upon completion.
     pub(crate) fn run(self: Arc<Self>) {
         let current = self.state.load(Ordering::Acquire);
 
@@ -62,17 +100,20 @@ impl<T: Send + 'static> Task<T> {
         let poll = unsafe { (&mut *self.future.get()).as_mut().poll(&mut cx) };
 
         match poll {
+            // The task is not yet complete.
             Poll::Pending => {
                 if self
                     .state
                     .compare_exchange(RUNNING, IDLE, Ordering::AcqRel, Ordering::Acquire)
                     .is_err()
                 {
+                    // The task was notified while running.
                     self.state.store(QUEUED, Ordering::Release);
                     self.injector.push(self.clone());
                 }
             }
 
+            // The task has completed.
             Poll::Ready(val) => {
                 unsafe {
                     *self.result.get() = Some(val);
@@ -88,11 +129,16 @@ impl<T: Send + 'static> Task<T> {
         }
     }
 
+    /// Wakes the task.
+    ///
+    /// This method is called via the task's waker and is responsible
+    /// for rescheduling the task according to its current state.
     pub fn wake(self: Arc<Self>) {
         loop {
             let state = self.state.load(Ordering::Acquire);
 
             match state {
+                // Idle tasks are re-queued for execution.
                 IDLE => {
                     if self
                         .state
@@ -103,6 +149,8 @@ impl<T: Send + 'static> Task<T> {
                         return;
                     }
                 }
+
+                // Running tasks record that they were notified.
                 RUNNING => {
                     if self
                         .state
@@ -112,9 +160,12 @@ impl<T: Send + 'static> Task<T> {
                         return;
                     }
                 }
+
+                // Already scheduled or completed tasks require no action.
                 QUEUED | NOTIFIED | COMPLETED => {
                     return;
                 }
+
                 _ => return,
             }
         }
@@ -122,11 +173,21 @@ impl<T: Send + 'static> Task<T> {
 }
 
 impl<T: Send + 'static> Runnable for Task<T> {
+    /// Executes the task as a runnable unit.
     fn run(self: Arc<Self>) {
         Task::run(self)
     }
 }
 
+/// Spawns a new asynchronous task onto the current runtime.
+///
+/// The task is scheduled either:
+/// - onto the current worker's local queue (if called from a worker),
+/// - or into the global injector queue otherwise.
+///
+/// # Panics
+///
+/// Panics if called outside of a running runtime.
 pub fn spawn<F, T>(future: F) -> JoinHandle<T>
 where
     T: Send + 'static,

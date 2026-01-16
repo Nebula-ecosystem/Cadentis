@@ -4,11 +4,25 @@ use std::ffi::CString;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
+/// A filesystem directory handle.
+///
+/// `Dir` provides asynchronous-friendly directory creation utilities.
+/// While directory creation itself is not awaitable at the OS level,
+/// these methods are exposed as async for API consistency with the
+/// rest of the filesystem module.
 pub struct Dir {
+    /// Path to the directory.
     path: PathBuf,
 }
 
 impl Dir {
+    /// Creates a single directory.
+    ///
+    /// This is the async equivalent of `std::fs::create_dir`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be created.
     pub async fn create(path: impl AsRef<Path>) -> io::Result<Self> {
         Self::make_directory(path.as_ref())?;
 
@@ -17,6 +31,17 @@ impl Dir {
         })
     }
 
+    /// Recursively creates a directory and all of its parent components.
+    ///
+    /// This is the async equivalent of `std::fs::create_dir_all`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - the path is empty,
+    /// - a parent directory (`..`) is encountered,
+    /// - a component is invalid or unsupported,
+    /// - a directory cannot be created.
     pub async fn create_all(path: impl AsRef<Path>) -> io::Result<Self> {
         let target = path.as_ref();
 
@@ -63,14 +88,17 @@ impl Dir {
         })
     }
 
+    /// Returns the path of this directory.
     pub fn path(&self) -> &Path {
         &self.path
     }
 
+    /// Returns `true` if the directory exists on disk.
     pub fn exists(&self) -> bool {
         self.path.is_dir()
     }
 
+    /// Creates a directory at the specified path.
     fn make_directory(path: &Path) -> io::Result<()> {
         let c_path = CString::new(
             path.as_os_str()

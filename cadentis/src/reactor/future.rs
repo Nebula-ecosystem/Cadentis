@@ -13,6 +13,13 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
+/// Asynchronous read operation on a raw file descriptor.
+///
+/// This future attempts to read data into the provided buffer.
+/// If the operation would block, it registers interest with the
+/// reactor and yields until the file descriptor becomes readable.
+///
+/// The file descriptor **must** be in non-blocking mode.
 pub struct ReadFuture<'a> {
     fd: RawFd,
     buffer: &'a mut [u8],
@@ -20,6 +27,7 @@ pub struct ReadFuture<'a> {
 }
 
 impl<'a> ReadFuture<'a> {
+    /// Creates a new `ReadFuture`.
     pub fn new(fd: RawFd, buffer: &'a mut [u8]) -> Self {
         Self {
             fd,
@@ -30,6 +38,7 @@ impl<'a> ReadFuture<'a> {
 }
 
 impl<'a> Future for ReadFuture<'a> {
+    /// Returns the number of bytes read.
     type Output = io::Result<usize>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -81,6 +90,12 @@ impl<'a> Future for ReadFuture<'a> {
     }
 }
 
+/// Asynchronous write operation on a raw file descriptor.
+///
+/// This future writes the entire buffer, yielding whenever the
+/// operation would block. Partial writes are handled internally.
+///
+/// The file descriptor **must** be in non-blocking mode.
 pub struct WriteFuture<'a> {
     fd: RawFd,
     buffer: &'a [u8],
@@ -89,6 +104,7 @@ pub struct WriteFuture<'a> {
 }
 
 impl<'a> WriteFuture<'a> {
+    /// Creates a new `WriteFuture`.
     pub fn new(fd: RawFd, buffer: &'a [u8]) -> Self {
         Self {
             fd,
@@ -160,12 +176,17 @@ impl<'a> Future for WriteFuture<'a> {
     }
 }
 
+/// Asynchronous accept operation on a listening socket.
+///
+/// Resolves with the newly accepted client file descriptor and
+/// its peer address.
 pub struct AcceptFuture {
     fd: RawFd,
     registered: bool,
 }
 
 impl AcceptFuture {
+    /// Creates a new `AcceptFuture`.
     pub(crate) fn new(fd: RawFd) -> Self {
         Self {
             fd,
@@ -221,6 +242,7 @@ impl Future for AcceptFuture {
     }
 }
 
+/// Asynchronous non-blocking connect operation.
 pub struct ConnectFuture {
     fd: RawFd,
     addr: SocketAddr,
@@ -228,6 +250,7 @@ pub struct ConnectFuture {
 }
 
 impl ConnectFuture {
+    /// Creates a new `ConnectFuture`.
     pub(crate) fn new(fd: RawFd, addr: SocketAddr) -> Self {
         Self {
             fd,
@@ -284,6 +307,7 @@ impl Future for ConnectFuture {
     }
 }
 
+/// Deregisters an I/O interest from the reactor if it was previously registered.
 fn deregister(fd: RawFd, registered: bool) {
     if registered {
         CURRENT_REACTOR.with(|cell| {
@@ -294,12 +318,17 @@ fn deregister(fd: RawFd, registered: bool) {
     }
 }
 
+/// Asynchronous read operation on a buffered stream.
+///
+/// Data is first read from the internal buffer filled by the reactor.
+/// If no data is available, the task is registered as a read waiter.
 pub struct ReadFutureStream<'a> {
     stream: Arc<Mutex<Stream>>,
     buffer: &'a mut [u8],
 }
 
 impl<'a> ReadFutureStream<'a> {
+    /// Creates a new stream read future.
     pub fn new(stream: Arc<Mutex<Stream>>, buffer: &'a mut [u8]) -> Self {
         Self { stream, buffer }
     }
@@ -336,6 +365,10 @@ impl<'a> Future for ReadFutureStream<'a> {
     }
 }
 
+/// Asynchronous write operation on a buffered stream.
+///
+/// Data is appended to the stream output buffer and flushed by
+/// the reactor when the file descriptor becomes writable.
 pub struct WriteFutureStream<'a> {
     stream: Arc<Mutex<Stream>>,
     buffer: &'a [u8],
@@ -343,6 +376,7 @@ pub struct WriteFutureStream<'a> {
 }
 
 impl<'a> WriteFutureStream<'a> {
+    /// Creates a new stream write future.
     pub fn new(stream: Arc<Mutex<Stream>>, buffer: &'a [u8]) -> Self {
         Self {
             stream,

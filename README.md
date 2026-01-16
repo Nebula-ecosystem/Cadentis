@@ -52,7 +52,7 @@
 
 ## 🚀 Getting Started
 
-This crate is not yet published on crates.io. Add it directly from GitHub:
+This crate is not published on crates.io. Add it directly from GitHub:
 
 ``` toml
 [dependencies]
@@ -66,25 +66,36 @@ cadentis = { git = "https://github.com/Nebula-ecosystem/Cadentis", package = "ca
 Accept and handle an incoming TCP connection using Cadentis async I/O and task scheduling:
 
 ```rust
-use cadentis::net::tcp_listener::TcpListener;
-use cadentis::spawn;
+use cadentis::net::tcp::TcpListener;
+use cadentis::task::spawn;
 
 #[cadentis::main]
 async fn main() {
-  let listener: TcpListener = TcpListener::bind("127.0.0.1")
-    .await
-    .expect("Failed to bind listener");
+    // Bind a TCP listener
+    let listener = TcpListener::bind("127.0.0.1:8080")
+        .expect("Failed to bind listener");
 
-  let handle: () = spawn(async move {
-    let (stream, _) = listener.accept().await.expect("Failed to accept incoming connection");
+    // Spawn a task to handle a single connection
+    spawn(async move {
+        let (stream, _) = listener
+            .accept()
+            .await
+            .expect("Failed to accept incoming connection");
 
-    let mut buf: [u8; 4] = [0u8; 4];
-    let n: usize = stream.read(&mut buf).await.expect("Failed to read");
+        let mut buf = [0u8; 4];
+        let n = stream
+            .read(&mut buf)
+            .await
+            .expect("Failed to read from stream");
 
-    if &buf[..n] == b"ping" {
-        stream.write_all(b"pong").await.expect("Failed to write");
-    }
-  }).await;
+        if &buf[..n] == b"ping" {
+            stream
+                .write_all(b"pong")
+                .await
+                .expect("Failed to write response");
+        }
+    })
+    .await;
 }
 ```
 

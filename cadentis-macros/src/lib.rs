@@ -2,6 +2,21 @@ mod utils;
 
 use proc_macro::{TokenStream, TokenTree};
 
+/// Awaits multiple futures concurrently and returns all results.
+///
+/// # Syntax
+///
+/// ```ignore
+/// join!(fut1, fut2, fut3)
+/// ```
+///
+/// - If zero futures are provided, returns `()`.
+/// - If one future is provided, awaits it and returns its output.
+/// - If multiple futures are provided, polls them concurrently and
+///   returns a tuple of all results once every future has completed.
+///
+/// This macro expands to a `poll_fn`-based implementation and does
+/// **not** allocate a separate task per future.
 #[proc_macro]
 pub fn join(input: TokenStream) -> TokenStream {
     let args = utils::split_args(input);
@@ -73,6 +88,29 @@ pub fn join(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Awaits the first future that completes and executes its handler.
+///
+/// # Syntax
+///
+/// ```ignore
+/// select!(
+///     fut1 => |v| { ... },
+///     fut2 => |v| { ... },
+/// )
+/// ```
+///
+/// Each branch consists of:
+/// - a future expression,
+/// - followed by `=>`,
+/// - followed by a handler expression (typically a closure).
+///
+/// The first future to resolve wins. All other futures are dropped.
+///
+/// # Semantics
+///
+/// - Futures are polled in declaration order.
+/// - The result of the selected handler is returned.
+/// - If no branches are provided, the macro expands to `()`.
 #[proc_macro]
 pub fn select(input: TokenStream) -> TokenStream {
     let branches = utils::parse_select_branches(input);
@@ -135,6 +173,31 @@ pub fn select(input: TokenStream) -> TokenStream {
     })
 }
 
+/// Marks an async function as the runtime entry point.
+///
+/// This attribute transforms an `async fn main` into a synchronous
+/// entry point that:
+///
+/// 1. Builds a Cadentis runtime
+/// 2. Executes the async body using `Runtime::block_on`
+///
+/// # Attributes
+///
+/// ```ignore
+/// #[cadentis::main]
+/// async fn main() { ... }
+///
+/// #[cadentis::main(worker_threads = 4)]
+/// async fn main() { ... }
+/// ```
+///
+/// Supported parameters:
+/// - `worker_threads = N`: number of worker threads for the runtime.
+///
+/// # Notes
+///
+/// - The `async` keyword is removed from the function signature.
+/// - The function body is wrapped in `block_on`.
 #[proc_macro_attribute]
 pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut tokens: Vec<TokenTree> = item.into_iter().collect();
@@ -197,6 +260,21 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
     tokens.into_iter().collect()
 }
 
+/// Marks an async function as a test executed inside a Cadentis runtime.
+///
+/// This attribute:
+/// - removes the `async` keyword,
+/// - wraps the function body in `Runtime::block_on`,
+/// - automatically adds `#[test]`.
+///
+/// # Example
+///
+/// ```ignore
+/// #[cadentis::test]
+/// async fn my_async_test() {
+///     // async test code
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut tokens = item.into_iter().collect::<Vec<_>>();
