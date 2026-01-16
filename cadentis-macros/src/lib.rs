@@ -171,6 +171,13 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     builder.push_str(".build()");
 
+    if let Some(async_pos) = tokens
+        .iter()
+        .position(|t| matches!(t, TokenTree::Ident(id) if id.to_string() == "async"))
+    {
+        tokens.remove(async_pos);
+    }
+
     let new_block = format!(
         "{{
             let runtime = {};
