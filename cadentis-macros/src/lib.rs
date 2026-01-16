@@ -202,6 +202,18 @@ pub fn select(input: TokenStream) -> TokenStream {
 pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut tokens: Vec<TokenTree> = item.into_iter().collect();
 
+    let async_pos = tokens
+        .iter()
+        .position(|t| matches!(t, TokenTree::Ident(id) if id.to_string() == "async"));
+
+    if let Some(pos) = async_pos {
+        tokens.remove(pos);
+    } else {
+        return "compile_error!(\"This function must be declared async\");"
+            .parse()
+            .unwrap();
+    }
+
     let attr_str = attr.to_string();
     let mut worker_threads: Option<usize> = None;
 
@@ -233,13 +245,6 @@ pub fn main(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     builder.push_str(".build()");
-
-    if let Some(async_pos) = tokens
-        .iter()
-        .position(|t| matches!(t, TokenTree::Ident(id) if id.to_string() == "async"))
-    {
-        tokens.remove(async_pos);
-    }
 
     let new_block = format!(
         "{{
