@@ -18,8 +18,14 @@ pub(crate) use common::Waker;
 #[cfg(target_os = "macos")]
 mod kqueue;
 
+#[cfg(target_os = "linux")]
+mod epoll;
+
 #[cfg(target_os = "macos")]
 pub(crate) type Poller = kqueue::KqueuePoller;
+
+#[cfg(target_os = "linux")]
+pub(crate) type Poller = epoll::EpollPoller;
 
 #[cfg(unix)]
 pub(crate) mod unix;

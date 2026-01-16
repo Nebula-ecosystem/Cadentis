@@ -1,9 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
-    "Cadentis",
-    "Cadentis-macros"
+    "cadentis",
+    "cadentis-macros"
 ]
 
 [workspace.dependencies]
-cadentis-macros = { path = "Cadentis-macros" }
+cadentis-macros = { path = "cadentis-macros" }

@@ -46,7 +46,7 @@
 
 - [ ] **Extensibility**
   - [ ] Windows Support (IOCP)
-  - [ ] Linux Support (epoll)
+  - [x] Linux Support (epoll)
 
 ---
 
