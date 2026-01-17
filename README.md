@@ -10,43 +10,37 @@
 
 ## 📊 Project Status
 
-- [x] **Runtime & Scheduling**
-  - [x] Task Spawning (async, background)
-  - [x] Event Loop (block_on, scheduling)
-  - [x] Thread-Local Context
+### ✅ Working Version
 
-- [x] **I/O & Filesystem**
-  - [x] Async File (non-blocking read/write)
-  - [x] Async Folder (mkdir, recursive creation)
-  - [x] TCP Listener (accept connections)
-  - [x] TCP Stream (read/write, echo)
+- [x] **Stable and usable version**
+  - Fully functional async runtime
+  - Reliable multi-threaded executor
+  - Working network and filesystem I/O
+  - Timers, sleep, timeout
+  - Ergonomic macros (`main`, `test`, `join!`, `select!`)
+  - macOS / Linux / Windows support
 
-- [x] **Reactor & Events**
-  - [x] Kqueue Integration (macOS)
-  - [x] Timer Events (sleep, timeout)
-  - [x] Event Registration (read/write/timer)
+> 👉 This milestone is **done**. Cadentis works.
 
-- [x] **Time & Utilities**
-  - [x] Sleep Future (async delay)
-  - [x] Timeout Combinator (deadline for tasks)
-  - [x] Time Measurement (benchmark async ops)
-  - [x] Retry Utility (repeated attempts)
+### 🚀 Next Priorities
 
-- [x] **Multithreading**
-  - [x] Multi-threaded Executor (work-stealing, thread pool)
-  - [x] Thread-safe Context (Arc, Mutex)
-  - [x] Cross-thread Task Spawning
-  - [x] Synchronization Primitives (Mutex, Condvar, etc.)
-  - [x] Structured Concurrency Primitives (join, select)
+- [ ] **Robustness**
+  - [ ] Graceful shutdown
+  - [ ] Task cancellation
+  - [ ] Prevent task leaks
 
-- [x] **Macros & Ergonomics**
-  - [x] `cadentis::main` proc-macro
-  - [x] `cadentis::test` proc-macro
-  - [x] `join!` / `select!` macros (extensible / variadic for arbitrary number of futures)
+- [ ] **Performance**
+  - [ ] Basic benchmarks
+  - [ ] Scheduler fairness
+  - [ ] Reduce allocations
 
-- [x] **Extensibility**
-  - [x] Windows Support (WSAPoll)
-  - [x] Linux Support (epoll)
+- [ ] **Debug & Introspection**
+  - [ ] Minimal runtime tracing
+  - [ ] Task lifecycle visibility
+
+- [ ] **API & Ergonomics**
+  - [ ] Refine spawn / join / select
+  - [ ] A few essential utility futures
 
 ---
 
@@ -54,7 +48,7 @@
 
 This crate is not published on crates.io. Add it directly from GitHub:
 
-``` toml
+```toml
 [dependencies]
 cadentis = { git = "https://github.com/Nebula-ecosystem/Cadentis", package = "cadentis" }
 ```
@@ -101,10 +95,44 @@ async fn main() {
 
 ---
 
+## 📚 Examples
+
+Cadentis includes **several practical examples** demonstrating how to use the runtime primitives in real-world scenarios:
+
+- TCP servers and clients  
+- Task spawning and coordination  
+- Timers, sleep, and timeouts  
+- Basic async I/O patterns  
+
+Examples are available in the repository under the `examples/` directory.
+
+Run an example with:
+
+```
+cargo run --example tcp_server
+```
+
+These examples are intentionally **minimal and focused**, showcasing how Cadentis primitives compose without hiding complexity behind heavy abstractions.
+
+---
+
+## 📖 Documentation
+
+You can generate the full API documentation locally using Cargo:
+
+```
+cargo doc --open
+```
+
+This will build and open the documentation for Cadentis and all its public APIs in your browser.
+
+> ⚠️ Cadentis is designed as a **low-level runtime**, so the documentation focuses on **clear contracts and primitives**, not high-level frameworks.
+
+---
 
 ## 🦀 Rust Version
 
-- **Developed with**: Rust 1.92.0
+- **Developed with**: Rust 1.92.0  
 - **MSRV**: Rust 1.92.0 (may increase in the future)
 
 ---
@@ -130,9 +158,11 @@ By using SSPL, we ensure that:
 In short, SSPL ensures that Cadentis — and the Nebula ecosystem built on top of it —  
 remains **open to the community, but protected from fragmentation and exploitation**.
 
+---
+
 ## 🤝 Contact
 
 For questions, discussions, or contributions, feel free to reach out:
 
-- **Discord**: enzoblain
+- **Discord**: enzoblain  
 - **Email**: [enzoblain@proton.me](mailto:enzoblain@proton.me)
