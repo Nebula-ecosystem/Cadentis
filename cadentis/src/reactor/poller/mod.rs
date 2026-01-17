@@ -21,14 +21,26 @@ mod kqueue;
 #[cfg(target_os = "linux")]
 mod epoll;
 
+#[cfg(target_os = "windows")]
+mod wsapoll;
+
 #[cfg(target_os = "macos")]
 pub(crate) type Poller = kqueue::KqueuePoller;
 
 #[cfg(target_os = "linux")]
 pub(crate) type Poller = epoll::EpollPoller;
 
+#[cfg(target_os = "windows")]
+pub(crate) type Poller = wsapoll::WSAPollPoller;
+
 #[cfg(unix)]
 pub(crate) mod unix;
 
 #[cfg(unix)]
 pub(crate) use unix as platform;
+
+#[cfg(windows)]
+pub(crate) mod windows;
+
+#[cfg(windows)]
+pub(crate) use windows as platform;

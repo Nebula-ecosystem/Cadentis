@@ -1,16 +1,14 @@
 use super::command::Command;
 use super::event::Event;
 use super::io::IoEntry;
-use super::poller::Poller;
-use super::poller::Waker;
-use super::poller::platform::{sys_close, sys_read, sys_write};
+use super::poller::platform::{RawFd, sys_close, sys_read, sys_write};
+use super::poller::{Poller, Waker};
 use super::timer::TimerEntry;
 use crate::reactor::io::Waiting;
 use crate::utils::Slab;
 
 use std::collections::BinaryHeap;
 use std::io;
-use std::os::fd::RawFd;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::SendError;

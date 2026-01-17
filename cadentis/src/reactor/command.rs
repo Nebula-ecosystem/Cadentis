@@ -1,7 +1,7 @@
 use super::io::IoEntry;
 use super::poller::common::Interest;
+use crate::reactor::poller::platform::RawFd;
 
-use std::os::fd::RawFd;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::task::Waker;

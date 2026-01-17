@@ -17,8 +17,8 @@ use crate::reactor::event::Event;
 use crate::reactor::poller::Waker;
 
 use libc::{
-    epoll_create1, epoll_ctl, epoll_event, epoll_wait, EPOLLERR, EPOLLHUP, EPOLLIN, EPOLLOUT,
-    EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD,
+    EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, EPOLLERR, EPOLLHUP, EPOLLIN,
+    EPOLLOUT, epoll_create1, epoll_ctl, epoll_event, epoll_wait,
 };
 use std::io;
 use std::os::unix::io::RawFd;

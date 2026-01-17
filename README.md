@@ -44,8 +44,8 @@
   - [x] `cadentis::test` proc-macro
   - [x] `join!` / `select!` macros (extensible / variadic for arbitrary number of futures)
 
-- [ ] **Extensibility**
-  - [ ] Windows Support (IOCP)
+- [x] **Extensibility**
+  - [x] Windows Support (WSAPoll)
   - [x] Linux Support (epoll)
 
 ---

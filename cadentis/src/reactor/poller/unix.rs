@@ -7,9 +7,10 @@ use libc::{
 };
 use std::ffi::c_uint;
 use std::net::{Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::os::fd::RawFd;
 use std::str::FromStr;
 use std::{io, mem};
+
+pub type RawFd = std::os::fd::RawFd;
 
 /// Default flags used when opening a file for reading.
 pub(crate) const OPENFLAGS: i32 = O_RDONLY | O_NONBLOCK;

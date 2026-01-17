@@ -1,9 +1,9 @@
 use crate::reactor::future::{ReadFuture, WriteFuture};
+use crate::reactor::poller::platform::RawFd;
 use crate::reactor::poller::platform::{CREATEFLAGS, OPENFLAGS, sys_close, sys_open};
 
 use std::ffi::CString;
 use std::io;
-use std::os::fd::RawFd;
 
 /// An asynchronous file handle.
 ///
@@ -42,8 +42,17 @@ impl File {
 
     /// Opens a file using the provided raw flags.
     fn open_with_flags(c_path: CString, flags: RawFd) -> io::Result<RawFd> {
+        #[cfg(windows)]
+        let fd = sys_open(c_path.as_ptr(), flags as i32, 0o644);
+
+        #[cfg(unix)]
         let fd = sys_open(c_path.as_ptr(), flags, 0o644);
 
+        #[cfg(windows)]
+        if fd == u64::MAX {
+            return Err(io::Error::last_os_error());
+        }
+        #[cfg(unix)]
         if fd < 0 {
             return Err(io::Error::last_os_error());
         }

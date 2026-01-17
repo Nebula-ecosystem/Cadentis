@@ -1,4 +1,4 @@
-use std::os::fd::RawFd;
+use super::platform::RawFd;
 
 /// I/O interest flags.
 ///

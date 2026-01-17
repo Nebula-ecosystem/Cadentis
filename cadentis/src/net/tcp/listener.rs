@@ -1,5 +1,6 @@
 use super::stream::TcpStream;
 use crate::reactor::future::AcceptFuture;
+use crate::reactor::poller::platform::RawFd;
 use crate::reactor::poller::platform::{
     sys_bind, sys_close, sys_ipv6_is_necessary, sys_listen, sys_parse_sockaddr, sys_set_reuseaddr,
     sys_socket, sys_sockname,
@@ -7,7 +8,6 @@ use crate::reactor::poller::platform::{
 
 use std::io;
 use std::net::SocketAddr;
-use std::os::fd::RawFd;
 
 /// An asynchronous TCP listener.
 ///

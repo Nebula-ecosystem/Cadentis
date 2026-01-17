@@ -1,14 +1,12 @@
 use crate::reactor::command::Command;
 use crate::reactor::io::{IoEntry, Stream, Waiting};
 use crate::reactor::poller::common::Interest;
-use crate::reactor::poller::platform::{sys_read, sys_write};
-use crate::reactor::poller::unix::{sys_accept, sys_connect};
+use crate::reactor::poller::platform::{RawFd, sys_accept, sys_connect, sys_read, sys_write};
 use crate::runtime::context::CURRENT_REACTOR;
 
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
-use std::os::fd::RawFd;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};

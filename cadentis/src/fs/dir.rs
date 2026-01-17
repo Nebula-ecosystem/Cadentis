@@ -50,14 +50,42 @@ impl Dir {
         }
 
         let mut acc = PathBuf::new();
+        let mut components = target.components();
 
-        if target.is_absolute() {
-            acc.push(Path::new("/"));
+        if let Some(first) = components.next() {
+            match first {
+                Component::Prefix(p) => {
+                    acc.push(p.as_os_str());
+
+                    if let Some(Component::RootDir) = components.next() {
+                        acc.push(Path::new("/"));
+                    }
+                }
+                Component::RootDir => {
+                    acc.push(Path::new("/"));
+                }
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "parent directory (..) not supported",
+                    ));
+                }
+                Component::Normal(seg) => {
+                    acc.push(seg);
+                    Self::make_directory(&acc).or_else(|e| {
+                        if e.kind() == io::ErrorKind::AlreadyExists && acc.is_dir() {
+                            Ok(())
+                        } else {
+                            Err(e)
+                        }
+                    })?;
+                }
+            }
         }
 
-        for component in target.components() {
+        for component in components {
             match component {
-                Component::RootDir => {}
                 Component::CurDir => {}
                 Component::ParentDir => {
                     return Err(io::Error::new(
@@ -74,7 +102,8 @@ impl Dir {
                         Err(e) => return Err(e),
                     }
                 }
-                _ => {
+                Component::RootDir => {}
+                Component::Prefix(_) => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "unsupported path component",
@@ -108,6 +137,14 @@ impl Dir {
 
         let rc = sys_mkdir(c_path.as_ptr(), 0o755);
 
+        #[cfg(windows)]
+        if rc == u64::MAX {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+
+        #[cfg(unix)]
         if rc < 0 {
             Err(io::Error::last_os_error())
         } else {
