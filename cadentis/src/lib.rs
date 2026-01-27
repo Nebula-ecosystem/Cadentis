@@ -14,6 +14,7 @@
 //! - **Async file and directory operations** for non-blocking filesystem access
 //! - **Async TCP networking** with listener and stream abstractions
 //! - **Timer primitives** including sleep, timeout, and intervals
+//! - **Async synchronization primitives** (mutexes, channels, and coordination tools)
 //! - **Ergonomic macros** like `#[cadentis::main]`, `#[cadentis::test]`, `join!`, and `select!`
 //!
 //! ## Quick Start
@@ -41,6 +42,7 @@
 //! - [`fs`] — Async file and directory operations
 //! - [`net`] — Async networking (TCP listener/stream)
 //! - [`time`] — Timers, sleep, timeout, and intervals
+//! - [`sync`] — Async synchronization primitives
 //! - [`tools`] — Utilities like retry mechanisms
 //!
 //! ## Getting Started
@@ -58,6 +60,7 @@ mod utils;
 
 pub mod fs;
 pub mod net;
+pub mod sync;
 pub mod time;
 pub mod tools;
 
