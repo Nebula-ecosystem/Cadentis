@@ -40,10 +40,40 @@ unsafe impl<T: Send> Send for Mutex<T> {}
 unsafe impl<T: Send> Sync for Mutex<T> {}
 
 impl<T> Mutex<T> {
+    /// Creates a new mutex wrapping the given value.
+    ///
+    /// # Example
+    /// ```
+    /// let mutex = Mutex::new(42);
+    /// ```
+    ///
+    /// The mutex is initially unlocked, and no waiters are present.
+    pub fn new(value: T) -> Mutex<T> {
+        Self {
+            // Indicates whether the mutex is currently locked.
+            locked: AtomicBool::new(false),
+
+            // List of tasks waiting to acquire the mutex.
+            // Protected by a standard Mutex to ensure safe concurrent access.
+            waiters: Mutex_std::new(Vec::new()),
+
+            // The data protected by the mutex.
+            // UnsafeCell allows mutable access even through a shared reference,
+            // which is required for interior mutability in async contexts.
+            data: UnsafeCell::new(value),
+        }
+    }
+
     /// Returns a future that will resolve to a guard when the mutex is acquired.
     ///
-    /// This does not block the thread; instead, the task is suspended until
+    /// This does **not block the thread**. Instead, the task is suspended until
     /// the mutex becomes available.
+    ///
+    /// # Example
+    /// ```rust
+    /// let guard = mutex.lock().await;
+    /// // The protected value can now be accessed via `*guard`.
+    /// ```
     pub fn lock(&self) -> LockFuture<'_, T> {
         LockFuture { mutex: self }
     }
