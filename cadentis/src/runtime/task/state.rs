@@ -23,3 +23,9 @@ pub(crate) const COMPLETED: usize = 3;
 /// This state indicates that the task was woken while already
 /// executing and should be re-queued once execution finishes.
 pub(crate) const NOTIFIED: usize = 4;
+
+/// Task has been cancelled.
+///
+/// The task was aborted before completion. Any further polling
+/// will result in an immediate return or panic depending on the handle.
+pub(crate) const CANCELLED: usize = 5;

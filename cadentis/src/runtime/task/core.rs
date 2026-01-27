@@ -1,8 +1,8 @@
-use super::state::{COMPLETED, IDLE, NOTIFIED, QUEUED, RUNNING};
+use super::JoinHandle;
+use super::state::{CANCELLED, COMPLETED, IDLE, NOTIFIED, QUEUED, RUNNING};
 use crate::runtime::context::{CURRENT_INJECTOR, CURRENT_LOCALS, CURRENT_WORKER_ID};
 use crate::runtime::task::waker::make_waker;
 use crate::runtime::work_stealing::injector::Injector;
-use crate::task::JoinHandle;
 
 use std::cell::UnsafeCell;
 use std::pin::Pin;
@@ -10,45 +10,38 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 
-/// A runnable unit of work.
+/// A runnable unit of work that can be executed by the scheduler.
 ///
-/// Types implementing `Runnable` can be scheduled and executed
-/// by the executor. This abstraction allows the scheduler to
-/// operate on heterogeneous task types.
-///
-/// In practice, `Runnable` is implemented by [`Task`].
+/// The `Runnable` trait abstracts the specific return type of a task,
+/// allowing the executor to manage a heterogeneous collection of tasks
+/// through `Arc<dyn Runnable>`.
 pub(crate) trait Runnable: Send + Sync {
-    /// Executes the runnable task.
+    /// Executes the task. This is typically called by a worker thread.
     fn run(self: Arc<Self>);
 }
 
-/// A spawned asynchronous task.
+/// A spawned asynchronous task managed by the runtime.
 ///
-/// A `Task` wraps a future and manages:
-/// - its execution state,
-/// - wake-up logic,
-/// - result storage,
-/// - coordination with the scheduler.
-///
-/// Tasks are reference-counted and can be safely shared across
-/// worker threads.
+/// A `Task` acts as the container for a `Future`. It coordinates the lifecycle
+/// of that future, including its execution state, waker registration,
+/// and result storage.
 pub(crate) struct Task<T> {
-    /// The future being executed.
+    /// The underlying future.
     ///
-    /// Stored in an `UnsafeCell` to allow mutable access across
-    /// poll invocations while respecting pinning guarantees.
+    /// Wrapped in `UnsafeCell` for interior mutability during `poll`, and
+    /// `Pin<Box<...>>` to ensure the future remains pinned in memory.
     future: UnsafeCell<Pin<Box<dyn Future<Output = T> + Send>>>,
 
-    /// Storage for the task result once completed.
+    /// Storage for the result produced by the future upon completion.
     pub(crate) result: UnsafeCell<Option<T>>,
 
-    /// Current execution state of the task.
+    /// The current lifecycle state of the task (IDLE, RUNNING, etc.).
     pub(crate) state: AtomicUsize,
 
-    /// Handle to the global injector queue.
+    /// Reference to the global injector queue for rescheduling.
     injector: Arc<Injector>,
 
-    /// Wakers waiting for the task to complete (used by `JoinHandle`).
+    /// A list of wakers belonging to `JoinHandle`s awaiting this task.
     pub(crate) waiters: Mutex<Vec<Waker>>,
 }
 
@@ -56,9 +49,10 @@ unsafe impl<T> Send for Task<T> {}
 unsafe impl<T> Sync for Task<T> {}
 
 impl<T: Send + 'static> Task<T> {
-    /// Creates a new task from a future.
+    /// Creates a new task instance from a future.
     ///
-    /// Newly created tasks start in the `QUEUED` state.
+    /// The task is initialized in the `QUEUED` state, indicating it is ready
+    /// to be processed by the scheduler.
     pub(crate) fn new<F>(future: F, injector: Arc<Injector>) -> Self
     where
         F: Future<Output = T> + Send + 'static,
@@ -72,20 +66,21 @@ impl<T: Send + 'static> Task<T> {
         }
     }
 
-    /// Executes the task.
+    /// Performs the execution of the task.
     ///
-    /// This method:
-    /// - transitions the task into the `RUNNING` state,
-    /// - polls the future,
-    /// - handles state transitions based on the poll result,
-    /// - wakes join handles upon completion.
+    /// This method transitions the task to `RUNNING`, polls the inner future,
+    /// and handles the resulting `Poll` state:
+    /// - `Poll::Pending`: Transitions back to `IDLE` or re-queues if notified.
+    /// - `Poll::Ready`: Stores the result and notifies all `JoinHandle` waiters.
     pub(crate) fn run(self: Arc<Self>) {
         let current = self.state.load(Ordering::Acquire);
 
-        if current != QUEUED && current != NOTIFIED {
+        // Early exit if the task is already cancelled or is not in a runnable state.
+        if current == CANCELLED || (current != QUEUED && current != NOTIFIED) {
             return;
         }
 
+        // Transition to RUNNING. This ensures exclusive access to the UnsafeCell.
         if self
             .state
             .compare_exchange(current, RUNNING, Ordering::AcqRel, Ordering::Acquire)
@@ -97,30 +92,30 @@ impl<T: Send + 'static> Task<T> {
         let waker = make_waker(self.clone());
         let mut cx = Context::from_waker(&waker);
 
+        // Safety: The RUNNING state guarantees that no other thread is polling this future.
         let poll = unsafe { (&mut *self.future.get()).as_mut().poll(&mut cx) };
 
         match poll {
-            // The task is not yet complete.
             Poll::Pending => {
+                // Return to IDLE state unless a wake-up occurred during execution (NOTIFIED).
                 if self
                     .state
                     .compare_exchange(RUNNING, IDLE, Ordering::AcqRel, Ordering::Acquire)
                     .is_err()
                 {
-                    // The task was notified while running.
+                    // Task was notified while running; move back to QUEUED and reschedule.
                     self.state.store(QUEUED, Ordering::Release);
                     self.injector.push(self.clone());
                 }
             }
-
-            // The task has completed.
             Poll::Ready(val) => {
+                // Store the result and finalize the task state.
                 unsafe {
                     *self.result.get() = Some(val);
                 }
-
                 self.state.store(COMPLETED, Ordering::Release);
 
+                // Wake all handles awaiting the result of this task.
                 let waiters = self.waiters.lock().unwrap();
                 for w in waiters.iter() {
                     w.wake_by_ref();
@@ -129,16 +124,16 @@ impl<T: Send + 'static> Task<T> {
         }
     }
 
-    /// Wakes the task.
+    /// Signals the task to be rescheduled.
     ///
-    /// This method is called via the task's waker and is responsible
-    /// for rescheduling the task according to its current state.
+    /// If the task is `IDLE`, it moves to `QUEUED` and is pushed to the scheduler.
+    /// If the task is `RUNNING`, it moves to `NOTIFIED` to ensure it is re-polled
+    /// immediately after its current execution slice.
     pub fn wake(self: Arc<Self>) {
         loop {
             let state = self.state.load(Ordering::Acquire);
 
             match state {
-                // Idle tasks are re-queued for execution.
                 IDLE => {
                     if self
                         .state
@@ -149,8 +144,6 @@ impl<T: Send + 'static> Task<T> {
                         return;
                     }
                 }
-
-                // Running tasks record that they were notified.
                 RUNNING => {
                     if self
                         .state
@@ -160,34 +153,56 @@ impl<T: Send + 'static> Task<T> {
                         return;
                     }
                 }
-
-                // Already scheduled or completed tasks require no action.
-                QUEUED | NOTIFIED | COMPLETED => {
-                    return;
-                }
-
+                // If the task is already queued, notified, or finished, no action is needed.
+                QUEUED | NOTIFIED | COMPLETED | CANCELLED => return,
                 _ => return,
+            }
+        }
+    }
+
+    /// Aborts the task execution.
+    ///
+    /// Transitions the task to the `CANCELLED` state. If the task transitions
+    /// successfully, all waiters are notified so they can stop awaiting the result.
+    pub fn abort(&self) {
+        loop {
+            let state = self.state.load(Ordering::Acquire);
+
+            // Cannot abort a task that is already finished or already cancelled.
+            if state == COMPLETED || state == CANCELLED {
+                return;
+            }
+
+            if self
+                .state
+                .compare_exchange(state, CANCELLED, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                // Notify waiters so they can observe the cancellation state.
+                let waiters = self.waiters.lock().unwrap();
+                for w in waiters.iter() {
+                    w.wake_by_ref();
+                }
+                break;
             }
         }
     }
 }
 
 impl<T: Send + 'static> Runnable for Task<T> {
-    /// Executes the task as a runnable unit.
     fn run(self: Arc<Self>) {
         Task::run(self)
     }
 }
 
-/// Spawns a new asynchronous task onto the current runtime.
+/// Spawns a future as a task onto the current runtime.
 ///
-/// The task is scheduled either:
-/// - onto the current worker's local queue (if called from a worker),
-/// - or into the global injector queue otherwise.
+/// The task is first attempted to be pushed to the local worker's queue
+/// for better cache locality. If called from outside the runtime, it is
+/// pushed to the global injector queue.
 ///
 /// # Panics
-///
-/// Panics if called outside of a running runtime.
+/// Panics if called outside the context of a running runtime.
 pub fn spawn<F, T>(future: F) -> JoinHandle<T>
 where
     T: Send + 'static,
@@ -196,12 +211,13 @@ where
     let injector = CURRENT_INJECTOR.with(|cell| {
         cell.borrow()
             .as_ref()
-            .expect("spawn called outside of runtime")
+            .expect("spawn must be called within the context of a runtime")
             .clone()
     });
 
     let task = Arc::new(Task::new(future, injector.clone()));
 
+    // Try local queue injection for performance.
     let pushed_locally = CURRENT_WORKER_ID.with(|id_cell| {
         let id = *id_cell.borrow();
         if let Some(id) = id {
@@ -217,6 +233,7 @@ where
         }
     });
 
+    // Fallback to global injector.
     if !pushed_locally {
         injector.push(task.clone());
     }

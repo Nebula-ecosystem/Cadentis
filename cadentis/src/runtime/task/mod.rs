@@ -4,16 +4,17 @@
 //! represent, schedule, and execute asynchronous tasks.
 //!
 //! It includes:
-//! - task state management,
-//! - custom waker integration,
-//! - join handles for awaiting task completion,
-//! - the core task and runnable abstractions.
+//! - **Task state management**: Atomic state transitions (IDLE, RUNNING, etc.).
+//! - **Task & Runnable**: The core unit of work executed by the scheduler.
+//! - **JoinHandle**: A handle to await the result of a single spawned task.
+//! - **JoinSet**: A collection of tasks that allows awaiting their completion
+//!   collectively or managing their lifecycle (e.g., mass cancellation).
 //!
-//! Most users will interact with this module through [`spawn`] and
-//! //! Join handles for spawned tasks, while the lower-level components
-//! are used internall by the executor.
+//! Most users will interact with this module through [`spawn`] to launch
+//! individual tasks or [`JoinSet`] to manage multiple concurrent tasks.
 
 pub(crate) mod handle;
+pub(crate) mod set;
 pub(crate) mod state;
 pub(crate) mod waker;
 
@@ -23,3 +24,4 @@ pub(crate) use handle::JoinHandle;
 pub mod core;
 
 pub use core::spawn;
+pub use set::JoinSet;
