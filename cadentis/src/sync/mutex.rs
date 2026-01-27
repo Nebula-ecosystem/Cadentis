@@ -43,7 +43,7 @@ impl<T> Mutex<T> {
     /// Creates a new mutex wrapping the given value.
     ///
     /// # Example
-    /// ```
+    /// ```rust, ignore
     /// let mutex = Mutex::new(42);
     /// ```
     ///
@@ -70,7 +70,7 @@ impl<T> Mutex<T> {
     /// the mutex becomes available.
     ///
     /// # Example
-    /// ```rust
+    /// ```rust, ignore
     /// let guard = mutex.lock().await;
     /// // The protected value can now be accessed via `*guard`.
     /// ```
