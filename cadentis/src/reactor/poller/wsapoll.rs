@@ -216,7 +216,7 @@ impl WSAPollPoller {
             return Err(io::Error::last_os_error());
         }
 
-        // Wake handling
+        // Drain wake socket if signaled (but don't return early - timers may have expired)
         let wake_mask = (POLLIN | POLLERR | POLLHUP | POLLNVAL) as i32;
         if (fds[0].revents as i32 & wake_mask) != 0 {
             unsafe {
@@ -229,7 +229,8 @@ impl WSAPollPoller {
                 ) > 0
                 {}
             }
-            return Ok(());
+            // Don't return here - continue to process any ready sockets
+            // and let the reactor check for expired timers
         }
 
         // Translate readiness into reactor events
