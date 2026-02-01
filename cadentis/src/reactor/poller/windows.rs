@@ -23,7 +23,7 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::Networking::WinSock::{
     AF_INET, AF_INET6, FIONBIO, INVALID_SOCKET, IPPROTO_IPV6, IPV6_V6ONLY, SD_BOTH, SD_RECEIVE,
-    SD_SEND, SO_REUSEADDR, SO_TYPE, SOCK_STREAM, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6,
+    SD_SEND, SO_ERROR, SO_REUSEADDR, SO_TYPE, SOCK_STREAM, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6,
     SOCKADDR_STORAGE, SOCKET, SOCKET_ERROR, SOL_SOCKET, WSADATA, WSAEWOULDBLOCK, WSAStartup,
     accept, bind, closesocket, connect, getsockname, getsockopt, ioctlsocket, listen, recv, send,
     setsockopt, shutdown, socket,
@@ -375,6 +375,32 @@ pub(crate) fn sys_shutdown(fd: RawFd, how: Shutdown) -> io::Result<()> {
     unsafe {
         if shutdown(fd as SOCKET, how) != 0 {
             Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Retrieves the pending socket error via `SO_ERROR`.
+///
+/// Returns `Ok(())` if no error is pending, or the error otherwise.
+pub(crate) fn sys_get_socket_error(fd: RawFd) -> io::Result<()> {
+    unsafe {
+        let mut err: i32 = 0;
+        let mut len: i32 = mem::size_of::<i32>() as i32;
+
+        let rc = getsockopt(
+            fd as SOCKET,
+            SOL_SOCKET,
+            SO_ERROR,
+            &mut err as *mut _ as *mut u8,
+            &mut len,
+        );
+
+        if rc != 0 {
+            Err(io::Error::last_os_error())
+        } else if err != 0 {
+            Err(io::Error::from_raw_os_error(err))
         } else {
             Ok(())
         }

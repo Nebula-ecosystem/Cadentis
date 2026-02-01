@@ -1,9 +1,9 @@
 use libc::{
     AF_INET, AF_INET6, F_GETFL, F_SETFL, IPPROTO_IPV6, IPV6_V6ONLY, O_CREAT, O_NONBLOCK, O_RDONLY,
-    O_TRUNC, O_WRONLY, SHUT_RD, SHUT_RDWR, SHUT_WR, SO_REUSEADDR, SOCK_STREAM, SOL_SOCKET, accept,
-    bind, c_char, c_int, close, connect, fcntl, getsockname, listen, mkdir, mode_t, open, read,
-    setsockopt, shutdown, sockaddr, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, socklen_t,
-    write,
+    O_TRUNC, O_WRONLY, SHUT_RD, SHUT_RDWR, SHUT_WR, SO_ERROR, SO_REUSEADDR, SOCK_STREAM,
+    SOL_SOCKET, accept, bind, c_char, c_int, close, connect, fcntl, getsockname, getsockopt,
+    listen, mkdir, mode_t, open, read, setsockopt, shutdown, sockaddr, sockaddr_in, sockaddr_in6,
+    sockaddr_storage, socket, socklen_t, write,
 };
 use std::ffi::c_uint;
 use std::net::{Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6};
@@ -159,6 +159,32 @@ pub(crate) fn sys_shutdown(fd: RawFd, how: Shutdown) -> io::Result<()> {
     let rc = unsafe { shutdown(fd, how) };
     if rc < 0 {
         Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+/// Retrieves the pending socket error via `SO_ERROR`.
+///
+/// Returns `Ok(())` if no error is pending, or the error otherwise.
+pub(crate) fn sys_get_socket_error(fd: RawFd) -> io::Result<()> {
+    let mut err: c_int = 0;
+    let mut len: socklen_t = mem::size_of::<c_int>() as socklen_t;
+
+    let rc = unsafe {
+        getsockopt(
+            fd,
+            SOL_SOCKET,
+            SO_ERROR,
+            &mut err as *mut _ as *mut _,
+            &mut len,
+        )
+    };
+
+    if rc < 0 {
+        Err(io::Error::last_os_error())
+    } else if err != 0 {
+        Err(io::Error::from_raw_os_error(err))
     } else {
         Ok(())
     }

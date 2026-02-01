@@ -1,7 +1,9 @@
 use crate::reactor::command::Command;
 use crate::reactor::io::{IoEntry, Stream, Waiting};
 use crate::reactor::poller::common::Interest;
-use crate::reactor::poller::platform::{RawFd, sys_accept, sys_connect, sys_read, sys_write};
+use crate::reactor::poller::platform::{
+    RawFd, sys_accept, sys_connect, sys_get_socket_error, sys_read, sys_write,
+};
 use crate::runtime::context::CURRENT_REACTOR;
 
 use std::future::Future;
@@ -244,6 +246,7 @@ impl Future for AcceptFuture {
 pub struct ConnectFuture {
     fd: RawFd,
     addr: SocketAddr,
+    started: bool,
     registered: bool,
 }
 
@@ -253,6 +256,7 @@ impl ConnectFuture {
         Self {
             fd,
             addr,
+            started: false,
             registered: false,
         }
     }
@@ -264,13 +268,34 @@ impl Future for ConnectFuture {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
+        // If we already started the connection, check if it completed
+        if this.started {
+            match sys_get_socket_error(this.fd) {
+                Ok(()) => {
+                    deregister(this.fd, this.registered);
+                    return Poll::Ready(Ok(()));
+                }
+                Err(err) => {
+                    deregister(this.fd, this.registered);
+                    return Poll::Ready(Err(err));
+                }
+            }
+        }
+
+        // First poll: initiate the connection
         match sys_connect(this.fd, &this.addr) {
             Ok(()) => {
-                deregister(this.fd, this.registered);
+                // Connected immediately (rare but possible on localhost)
                 Poll::Ready(Ok(()))
             }
 
-            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
+            Err(err)
+                if err.kind() == io::ErrorKind::WouldBlock
+                    || err.kind() == io::ErrorKind::InvalidInput  // EALREADY
+                    || err.raw_os_error() == Some(libc::EINPROGRESS) =>
+            {
+                this.started = true;
+
                 if !this.registered {
                     CURRENT_REACTOR.with(|cell| {
                         let binding = cell.borrow();
