@@ -21,6 +21,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// A `TcpStream` must be created and used **inside a running runtime**
 /// (i.e. within a context where the reactor is available).
+#[derive(Clone)]
 pub struct TcpStream {
     stream: Arc<Mutex<Stream>>,
 }
