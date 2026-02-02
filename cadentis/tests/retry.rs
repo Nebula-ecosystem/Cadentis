@@ -120,9 +120,9 @@ async fn test_timeout_with_retry() {
         task::spawn(async move {
             let n = attempts.fetch_add(1, Ordering::SeqCst);
 
-            timeout(Duration::from_millis(10), async move {
+            timeout(Duration::from_millis(50), async move {
                 if n < 3 {
-                    sleep(Duration::from_millis(20)).await;
+                    sleep(Duration::from_millis(100)).await;
                     Ok::<_, &'static str>(0)
                 } else {
                     Ok::<_, &'static str>(123)
