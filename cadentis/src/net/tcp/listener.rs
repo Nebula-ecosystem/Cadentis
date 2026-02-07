@@ -1,11 +1,11 @@
 use super::stream::TcpStream;
 use crate::reactor::future::AcceptFuture;
-use crate::reactor::poller::platform::RawFd;
-use crate::reactor::poller::platform::{
-    sys_bind, sys_close, sys_ipv6_is_necessary, sys_listen, sys_parse_sockaddr, sys_set_reuseaddr,
-    sys_socket, sys_sockname,
-};
 
+use nucleus::address::sys_parse_sockaddr;
+use nucleus::io::{RawFd, sys_close};
+use nucleus::socket::{
+    sys_bind, sys_ipv6_is_necessary, sys_listen, sys_set_reuseaddr, sys_socket, sys_sockname,
+};
 use std::io;
 use std::net::SocketAddr;
 

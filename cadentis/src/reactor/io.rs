@@ -1,8 +1,8 @@
-use crate::reactor::poller::common::Interest;
-use crate::reactor::poller::platform::RawFd;
-
 use std::sync::{Arc, Mutex};
 use std::task::Waker;
+
+use nucleus::io::RawFd;
+use nucleus::poll::Interest;
 
 /// An entry registered in the reactor for I/O readiness.
 ///

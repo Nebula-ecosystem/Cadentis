@@ -1,14 +1,12 @@
 use crate::reactor::command::Command;
 use crate::reactor::future::{ConnectFuture, ReadFutureStream, WriteFutureStream};
 use crate::reactor::io::{IoEntry, Stream};
-use crate::reactor::poller::common::Interest;
-use crate::reactor::poller::platform::RawFd;
-use crate::reactor::poller::platform::{
-    sockaddr_storage_to_socketaddr, sys_close, sys_ipv6_is_necessary, sys_parse_sockaddr,
-    sys_set_reuseaddr, sys_shutdown, sys_socket,
-};
 use crate::runtime::context::CURRENT_REACTOR;
 
+use nucleus::address::{sockaddr_storage_to_socketaddr, sys_parse_sockaddr};
+use nucleus::io::{RawFd, sys_close};
+use nucleus::poll::Interest;
+use nucleus::socket::{sys_ipv6_is_necessary, sys_set_reuseaddr, sys_shutdown, sys_socket};
 use std::io;
 use std::net::Shutdown;
 use std::sync::{Arc, Mutex};

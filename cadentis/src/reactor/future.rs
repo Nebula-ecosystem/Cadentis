@@ -1,11 +1,10 @@
 use crate::reactor::command::Command;
 use crate::reactor::io::{IoEntry, Stream, Waiting};
-use crate::reactor::poller::common::Interest;
-use crate::reactor::poller::platform::{
-    RawFd, sys_accept, sys_connect, sys_get_socket_error, sys_read, sys_write,
-};
 use crate::runtime::context::CURRENT_REACTOR;
 
+use nucleus::io::{RawFd, sys_read, sys_write};
+use nucleus::poll::Interest;
+use nucleus::socket::{EINPROGRESS, sys_accept, sys_connect, sys_get_socket_error};
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
@@ -292,7 +291,7 @@ impl Future for ConnectFuture {
             Err(err)
                 if err.kind() == io::ErrorKind::WouldBlock
                     || err.kind() == io::ErrorKind::InvalidInput  // EALREADY
-                    || err.raw_os_error() == Some(libc::EINPROGRESS) =>
+                    || err.raw_os_error() == Some(EINPROGRESS) =>
             {
                 this.started = true;
 

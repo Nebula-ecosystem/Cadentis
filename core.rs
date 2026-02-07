@@ -1,11 +1,11 @@
+use nucleus::poll::{Event, Poller};
+
 use super::command::Command;
 use super::io::IoEntry;
 use super::timer::TimerEntry;
 use crate::reactor::io::Waiting;
 use crate::utils::Slab;
 
-use nucleus::io::{RawFd, sys_close, sys_read, sys_write};
-use nucleus::poll::{Event, Poller, Waker};
 use std::collections::BinaryHeap;
 use std::io;
 use std::sync::Arc;

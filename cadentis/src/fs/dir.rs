@@ -1,5 +1,4 @@
-use crate::reactor::poller::platform::sys_mkdir;
-
+use nucleus::fs::sys_mkdir;
 use std::ffi::CString;
 use std::io;
 use std::path::{Component, Path, PathBuf};
@@ -135,7 +134,7 @@ impl Dir {
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "non UTF-8 path"))?,
         )?;
 
-        let rc = sys_mkdir(c_path.as_ptr(), 0o755);
+        let rc = unsafe { sys_mkdir(c_path.as_ptr(), 0o755) };
 
         #[cfg(windows)]
         if rc == u64::MAX {
